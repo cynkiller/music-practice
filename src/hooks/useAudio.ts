@@ -118,7 +118,7 @@ export function useAudio() {
   );
 
   const playNote = useCallback(
-    async (note: string, durationMs = 500) => {
+    async (note: string, durationMs = 800) => {
       const piano = await ensurePiano();
       piano.triggerAttackRelease(note, durationMs / 1000);
     },
