@@ -1,6 +1,6 @@
 # Music Game Development Plan
 
-This plan outlines the development of a web-based music interval and chord recognition game with single-player focus, featuring difficulty modes, comprehensive mistake tracking, and personalized learning features.
+This plan outlines the development of a web-based music interval and chord recognition game with single-player focus, featuring difficulty modes, comprehensive mistake tracking, and personalized learning features. Use Salamander Grand Piano as the sound source.
 
 ## Core Features
 
