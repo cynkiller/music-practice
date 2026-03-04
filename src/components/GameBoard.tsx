@@ -95,6 +95,10 @@ export function GameBoard({
               onPlaySound();
               onStartAnswering();
             }}
+            onTouchStart={() => {
+              onPlaySound();
+              onStartAnswering();
+            }}
             className="flex items-center gap-2 px-8 py-4 bg-violet-600 hover:bg-violet-500 text-white font-bold rounded-2xl transition-all hover:scale-[1.03] active:scale-[0.97] cursor-pointer text-lg"
           >
             <Play className="w-6 h-6" fill="currentColor" />
@@ -106,6 +110,7 @@ export function GameBoard({
           <>
             <button
               onClick={onPlaySound}
+              onTouchStart={onPlaySound}
               className="flex items-center gap-2 px-4 py-2 bg-slate-700 hover:bg-slate-600 text-white rounded-xl transition-colors cursor-pointer text-sm"
             >
               <Volume2 className="w-4 h-4" />
@@ -114,6 +119,7 @@ export function GameBoard({
             {status === 'feedback' && currentQuestion.type === 'chord' && (
               <button
                 onClick={onPlayArpeggio}
+                onTouchStart={onPlayArpeggio}
                 className="flex items-center gap-2 px-4 py-2 bg-slate-700 hover:bg-slate-600 text-white rounded-xl transition-colors cursor-pointer text-sm"
               >
                 <ListMusic className="w-4 h-4" />

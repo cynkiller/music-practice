@@ -7,11 +7,23 @@ import { DIFFICULTY_CONFIGS } from '../lib/musicTheory.ts';
 export function useAudio() {
   const pianoRef = useRef<Tone.Sampler | null>(null);
   const loadedRef = useRef<boolean>(false);
+  const audioContextStartedRef = useRef<boolean>(false);
+
+  const startAudioContext = useCallback(async () => {
+    if (!audioContextStartedRef.current) {
+      // Resume audio context if suspended (required for mobile)
+      if (Tone.getContext().state === 'suspended') {
+        await Tone.getContext().resume();
+      }
+      // Start Tone.js
+      await Tone.start();
+      audioContextStartedRef.current = true;
+    }
+  }, []);
 
   const ensurePiano = useCallback(async () => {
-    if (Tone.getContext().state !== 'running') {
-      await Tone.start();
-    }
+    await startAudioContext();
+    
     if (!pianoRef.current) {
       pianoRef.current = new Tone.Sampler({
         urls: {
@@ -58,7 +70,7 @@ export function useAudio() {
       await Tone.loaded();
     }
     return pianoRef.current;
-  }, []);
+  }, [startAudioContext]);
 
   const playInterval = useCallback(
     async (rootNote: string, semitones: number, difficulty: Difficulty) => {
