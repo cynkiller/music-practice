@@ -9,11 +9,61 @@ export function useAudio() {
   const loadedRef = useRef<boolean>(false);
   const audioContextStartedRef = useRef<boolean>(false);
 
+  // Preload piano samples without starting audio context (mobile-friendly)
+  useEffect(() => {
+    const preloadPiano = async () => {
+      if (!pianoRef.current) {
+        pianoRef.current = new Tone.Sampler({
+          urls: {
+            A0: 'A0.mp3',
+            C1: 'C1.mp3',
+            'D#1': 'Ds1.mp3',
+            'F#1': 'Fs1.mp3',
+            A1: 'A1.mp3',
+            C2: 'C2.mp3',
+            'D#2': 'Ds2.mp3',
+            'F#2': 'Fs2.mp3',
+            A2: 'A2.mp3',
+            C3: 'C3.mp3',
+            'D#3': 'Ds3.mp3',
+            'F#3': 'Fs3.mp3',
+            A3: 'A3.mp3',
+            C4: 'C4.mp3',
+            'D#4': 'Ds4.mp3',
+            'F#4': 'Fs4.mp3',
+            A4: 'A4.mp3',
+            C5: 'C5.mp3',
+            'D#5': 'Ds5.mp3',
+            'F#5': 'Fs5.mp3',
+            A5: 'A5.mp3',
+            C6: 'C6.mp3',
+            'D#6': 'Ds6.mp3',
+            'F#6': 'Fs6.mp3',
+            A6: 'A6.mp3',
+            C7: 'C7.mp3',
+            'D#7': 'Ds7.mp3',
+            'F#7': 'Fs7.mp3',
+            A7: 'A7.mp3',
+            C8: 'C8.mp3',
+          },
+          baseUrl: '/music-practice/audio/',
+          onload: () => {
+            loadedRef.current = true;
+          },
+        }).toDestination();
+        pianoRef.current.volume.value = -10;
+      }
+    };
+    
+    preloadPiano();
+  }, []);
+
   const startAudioContext = useCallback(async () => {
     if (!audioContextStartedRef.current) {
       // Resume audio context if suspended (required for mobile)
-      if (Tone.getContext().state === 'suspended') {
-        await Tone.getContext().resume();
+      const context = Tone.getContext();
+      if (context.state === 'suspended') {
+        await context.resume();
       }
       // Start Tone.js
       await Tone.start();
@@ -32,58 +82,17 @@ export function useAudio() {
   const ensurePiano = useCallback(async () => {
     await startAudioContext();
     
-    if (!pianoRef.current) {
-      pianoRef.current = new Tone.Sampler({
-        urls: {
-          A0: 'A0.mp3',
-          C1: 'C1.mp3',
-          'D#1': 'Ds1.mp3',
-          'F#1': 'Fs1.mp3',
-          A1: 'A1.mp3',
-          C2: 'C2.mp3',
-          'D#2': 'Ds2.mp3',
-          'F#2': 'Fs2.mp3',
-          A2: 'A2.mp3',
-          C3: 'C3.mp3',
-          'D#3': 'Ds3.mp3',
-          'F#3': 'Fs3.mp3',
-          A3: 'A3.mp3',
-          C4: 'C4.mp3',
-          'D#4': 'Ds4.mp3',
-          'F#4': 'Fs4.mp3',
-          A4: 'A4.mp3',
-          C5: 'C5.mp3',
-          'D#5': 'Ds5.mp3',
-          'F#5': 'Fs5.mp3',
-          A5: 'A5.mp3',
-          C6: 'C6.mp3',
-          'D#6': 'Ds6.mp3',
-          'F#6': 'Fs6.mp3',
-          A6: 'A6.mp3',
-          C7: 'C7.mp3',
-          'D#7': 'Ds7.mp3',
-          'F#7': 'Fs7.mp3',
-          A7: 'A7.mp3',
-          C8: 'C8.mp3',
-        },
-        baseUrl: '/music-practice/audio/',
-        onload: () => {
-          loadedRef.current = true;
-        },
-      }).toDestination();
-      pianoRef.current.volume.value = -10;
-    }
-    // Wait for samples to load (up to 10s)
+    // Wait for samples to load if not ready yet (up to 10s)
     if (!loadedRef.current) {
       await Tone.loaded();
     }
+    
+    if (!pianoRef.current) {
+      throw new Error('Piano sampler not initialized');
+    }
+    
     return pianoRef.current;
   }, [startAudioContext]);
-
-  // Preload piano samples on hook initialization
-  useEffect(() => {
-    ensurePiano();
-  }, [ensurePiano]);
 
   const playInterval = useCallback(
     async (rootNote: string, semitones: number, difficulty: Difficulty) => {
