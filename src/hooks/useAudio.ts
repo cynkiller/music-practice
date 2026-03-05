@@ -58,7 +58,7 @@ export function useAudio() {
           A7: 'A7.mp3',
           C8: 'C8.mp3',
         },
-        baseUrl: 'https://tonejs.github.io/audio/salamander/',
+        baseUrl: '/audio/',
         onload: () => {
           loadedRef.current = true;
         },
