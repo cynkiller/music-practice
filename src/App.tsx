@@ -10,7 +10,7 @@ import { ProgressCharts } from './components/ProgressCharts.tsx';
 import type { Answer, Difficulty } from './types/index.ts';
 
 function App() {
-  const { playInterval, playChord, playArpeggio, stopAll } = useAudio();
+  const { playInterval, playChord, playArpeggio, stopAll, isLoading } = useAudio();
   const {
     progress,
     recordAnswer,
@@ -99,9 +99,18 @@ function App() {
       />
 
       <main className="flex-1 px-4 py-8">
-        {state.status === 'menu' && (
-          <DifficultySelector
-            onSelect={startGame}
+        {isLoading ? (
+          <div className="flex items-center justify-center h-full">
+            <div className="text-center">
+              <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-violet-500 mx-auto mb-4"></div>
+              <p className="text-slate-400">Loading audio samples...</p>
+            </div>
+          </div>
+        ) : (
+          <>
+            {state.status === 'menu' && (
+              <DifficultySelector
+                onSelect={startGame}
             highestLevel={progress.highestLevel}
           />
         )}
@@ -135,6 +144,8 @@ function App() {
             accuracyOverTime={getAccuracyOverTime()}
             weaknesses={getWeaknesses()}
           />
+        )}
+          </>
         )}
       </main>
     </div>

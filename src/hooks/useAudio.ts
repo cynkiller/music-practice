@@ -1,4 +1,4 @@
-import { useCallback, useRef, useEffect } from 'react';
+import { useCallback, useRef, useEffect, useState } from 'react';
 import * as Tone from 'tone';
 import { noteFromSemitone } from '../lib/musicTheory.ts';
 import type { Difficulty } from '../types/index.ts';
@@ -8,6 +8,7 @@ export function useAudio() {
   const pianoRef = useRef<Tone.Sampler | null>(null);
   const loadedRef = useRef<boolean>(false);
   const audioContextStartedRef = useRef<boolean>(false);
+  const [isLoading, setIsLoading] = useState(true);
 
   // Preload piano samples without starting audio context (mobile-friendly)
   useEffect(() => {
@@ -49,6 +50,7 @@ export function useAudio() {
           baseUrl: '/music-practice/audio/',
           onload: () => {
             loadedRef.current = true;
+            setIsLoading(false);
           },
         }).toDestination();
         pianoRef.current.volume.value = -10;
@@ -147,5 +149,5 @@ export function useAudio() {
     [ensurePiano]
   );
 
-  return { playInterval, playChord, playArpeggio, playNote, stopAll };
+  return { playInterval, playChord, playArpeggio, playNote, stopAll, isLoading };
 }
