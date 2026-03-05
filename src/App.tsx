@@ -10,7 +10,7 @@ import { ProgressCharts } from './components/ProgressCharts.tsx';
 import type { Answer, Difficulty } from './types/index.ts';
 
 function App() {
-  const { playInterval, playChord, playArpeggio } = useAudio();
+  const { playInterval, playChord, playArpeggio, stopAll } = useAudio();
   const {
     progress,
     recordAnswer,
@@ -117,6 +117,7 @@ function App() {
             onAnswer={submitAnswer}
             onNext={nextQuestion}
             onQuit={goToMenu}
+            stopAll={stopAll}
           />
         )}
 

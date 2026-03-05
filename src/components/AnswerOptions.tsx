@@ -5,6 +5,7 @@ interface AnswerOptionsProps {
   correctAnswer?: string;
   userAnswer?: string;
   showResult: boolean;
+  stopAll?: () => void;
 }
 
 export function AnswerOptions({
@@ -14,6 +15,7 @@ export function AnswerOptions({
   correctAnswer,
   userAnswer,
   showResult,
+  stopAll,
 }: AnswerOptionsProps) {
   function getButtonStyle(option: string): string {
     const base =
@@ -37,7 +39,12 @@ export function AnswerOptions({
       {options.map(option => (
         <button
           key={option}
-          onClick={() => !disabled && onSelect(option)}
+          onClick={() => {
+            if (!disabled) {
+              stopAll?.();
+              onSelect(option);
+            }
+          }}
           disabled={disabled}
           className={getButtonStyle(option)}
         >

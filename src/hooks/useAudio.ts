@@ -1,4 +1,4 @@
-import { useCallback, useRef } from 'react';
+import { useCallback, useRef, useEffect } from 'react';
 import * as Tone from 'tone';
 import { noteFromSemitone } from '../lib/musicTheory.ts';
 import type { Difficulty } from '../types/index.ts';
@@ -19,6 +19,14 @@ export function useAudio() {
       await Tone.start();
       audioContextStartedRef.current = true;
     }
+  }, []);
+
+  const stopAll = useCallback(() => {
+    if (pianoRef.current) {
+      pianoRef.current.releaseAll();
+    }
+    Tone.Transport.stop();
+    Tone.Transport.cancel();
   }, []);
 
   const ensurePiano = useCallback(async () => {
@@ -58,7 +66,7 @@ export function useAudio() {
           A7: 'A7.mp3',
           C8: 'C8.mp3',
         },
-        baseUrl: '/audio/',
+        baseUrl: '/music-practice/audio/',
         onload: () => {
           loadedRef.current = true;
         },
@@ -71,6 +79,11 @@ export function useAudio() {
     }
     return pianoRef.current;
   }, [startAudioContext]);
+
+  // Preload piano samples on hook initialization
+  useEffect(() => {
+    ensurePiano();
+  }, [ensurePiano]);
 
   const playInterval = useCallback(
     async (rootNote: string, semitones: number, difficulty: Difficulty) => {
@@ -125,5 +138,5 @@ export function useAudio() {
     [ensurePiano]
   );
 
-  return { playInterval, playChord, playArpeggio, playNote };
+  return { playInterval, playChord, playArpeggio, playNote, stopAll };
 }

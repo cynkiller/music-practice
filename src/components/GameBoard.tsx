@@ -14,6 +14,7 @@ interface GameBoardProps {
   onAnswer: (answer: string) => void;
   onNext: () => void;
   onQuit: () => void;
+  stopAll?: () => void;
 }
 
 export function GameBoard({
@@ -24,6 +25,7 @@ export function GameBoard({
   onAnswer,
   onNext,
   onQuit,
+  stopAll,
 }: GameBoardProps) {
   const { currentQuestion, status, difficulty } = state;
   const config = DIFFICULTY_CONFIGS[difficulty];
@@ -67,7 +69,10 @@ export function GameBoard({
           correctAnswers={state.correctAnswers}
         />
         <button
-          onClick={onQuit}
+          onClick={() => {
+            stopAll?.();
+            onQuit();
+          }}
           className="text-slate-500 hover:text-white text-sm px-3 py-1 rounded-lg hover:bg-slate-800 transition-colors"
         >
           Quit
@@ -92,11 +97,13 @@ export function GameBoard({
         {status === 'playing' && (
           <button
             onClick={() => {
+              stopAll?.();
               onPlaySound();
               onStartAnswering();
             }}
             onTouchStart={(e) => {
               e.preventDefault();
+              stopAll?.();
               onPlaySound();
               onStartAnswering();
             }}
@@ -110,9 +117,13 @@ export function GameBoard({
         {(status === 'answering' || status === 'feedback') && (
           <>
             <button
-              onClick={onPlaySound}
+              onClick={() => {
+                stopAll?.();
+                onPlaySound();
+              }}
               onTouchStart={(e) => {
                 e.preventDefault();
+                stopAll?.();
                 onPlaySound();
               }}
               className="flex items-center gap-2 px-4 py-2 bg-slate-700 hover:bg-slate-600 text-white rounded-xl transition-colors cursor-pointer text-sm"
@@ -122,9 +133,13 @@ export function GameBoard({
             </button>
             {status === 'feedback' && currentQuestion.type === 'chord' && (
               <button
-                onClick={onPlayArpeggio}
+                onClick={() => {
+                  stopAll?.();
+                  onPlayArpeggio();
+                }}
                 onTouchStart={(e) => {
                   e.preventDefault();
+                  stopAll?.();
                   onPlayArpeggio();
                 }}
                 className="flex items-center gap-2 px-4 py-2 bg-slate-700 hover:bg-slate-600 text-white rounded-xl transition-colors cursor-pointer text-sm"
@@ -146,6 +161,7 @@ export function GameBoard({
           correctAnswer={status === 'feedback' ? currentQuestion.targetName : undefined}
           userAnswer={status === 'feedback' ? lastAnswer?.userAnswer : undefined}
           showResult={status === 'feedback'}
+          stopAll={stopAll}
         />
       )}
 
@@ -169,7 +185,10 @@ export function GameBoard({
           </div>
 
           <button
-            onClick={onNext}
+            onClick={() => {
+              stopAll?.();
+              onNext();
+            }}
             className="flex items-center gap-2 px-6 py-3 bg-violet-600 hover:bg-violet-500 text-white font-semibold rounded-xl transition-all hover:scale-[1.02] active:scale-[0.97] cursor-pointer"
           >
             <ArrowRight className="w-5 h-5" />
