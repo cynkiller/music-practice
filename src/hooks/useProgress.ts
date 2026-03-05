@@ -1,4 +1,5 @@
 import { useState, useCallback, useEffect } from 'react';
+import Taro from '@tarojs/taro';
 import type { UserProgress, Answer, Difficulty } from '../types/index.ts';
 
 const STORAGE_KEY = 'music-practice-progress';
@@ -16,18 +17,22 @@ function getDefaultProgress(): UserProgress {
 
 function loadProgress(): UserProgress {
   try {
-    const raw = localStorage.getItem(STORAGE_KEY);
+    const raw = Taro.getStorageSync(STORAGE_KEY);
     if (raw) {
       return JSON.parse(raw) as UserProgress;
     }
   } catch {
-    // ignore parse errors
+    // ignore errors
   }
   return getDefaultProgress();
 }
 
 function saveProgress(progress: UserProgress) {
-  localStorage.setItem(STORAGE_KEY, JSON.stringify(progress));
+  try {
+    Taro.setStorageSync(STORAGE_KEY, JSON.stringify(progress));
+  } catch {
+    // ignore errors
+  }
 }
 
 export function useProgress() {
@@ -42,7 +47,7 @@ export function useProgress() {
       ...prev,
       totalQuestionsAnswered: prev.totalQuestionsAnswered + 1,
       totalCorrect: prev.totalCorrect + (answer.isCorrect ? 1 : 0),
-      answers: [...prev.answers.slice(-499), answer], // keep last 500
+      answers: [...prev.answers.slice(-499), answer],
       lastPlayed: Date.now(),
     }));
   }, []);

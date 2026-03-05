@@ -1,0 +1,12 @@
+/* Page container fill */
+.container {
+  min-height: 100vh;
+  background-color: #0f172a;
+}
+
+/* Grid layout helper for answer buttons */
+.answers-grid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 16rpx;
+}

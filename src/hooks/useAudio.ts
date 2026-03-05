@@ -1,152 +1,130 @@
-import { useCallback, useRef, useEffect, useState } from 'react';
-import * as Tone from 'tone';
-import { noteFromSemitone } from '../lib/musicTheory.ts';
+import { useCallback, useRef, useState } from 'react';
+import Taro from '@tarojs/taro';
+import { noteFromSemitone, DIFFICULTY_CONFIGS } from '../lib/musicTheory.ts';
 import type { Difficulty } from '../types/index.ts';
-import { DIFFICULTY_CONFIGS } from '../lib/musicTheory.ts';
+
+// Note name to MIDI number
+function noteToMidi(note: string): number {
+  const noteNames: Record<string, number> = {
+    C: 0, 'C#': 1, Db: 1, D: 2, 'D#': 3, Eb: 3,
+    E: 4, F: 5, 'F#': 6, Gb: 6, G: 7, 'G#': 8,
+    Ab: 8, A: 9, 'A#': 10, Bb: 10, B: 11,
+  };
+  const match = note.match(/^([A-G][#b]?)(\d+)$/);
+  if (!match) return 69;
+  const [, name, octave] = match;
+  return 12 * (parseInt(octave) + 1) + (noteNames[name] ?? 0);
+}
+
+function noteToFrequency(note: string): number {
+  return 440 * Math.pow(2, (noteToMidi(note) - 69) / 12);
+}
 
 export function useAudio() {
-  const pianoRef = useRef<Tone.Sampler | null>(null);
-  const loadedRef = useRef<boolean>(false);
-  const audioContextStartedRef = useRef<boolean>(false);
-  const [isLoading, setIsLoading] = useState(true);
+  const audioCtxRef = useRef<any>(null);
+  const [isLoading] = useState(false);
+  const activeNodesRef = useRef<Array<{ oscillator: any; gain: any }>>([]);
 
-  // Preload piano samples without starting audio context (mobile-friendly)
-  useEffect(() => {
-    const preloadPiano = async () => {
-      if (!pianoRef.current) {
-        pianoRef.current = new Tone.Sampler({
-          urls: {
-            A0: 'A0.mp3',
-            C1: 'C1.mp3',
-            'D#1': 'Ds1.mp3',
-            'F#1': 'Fs1.mp3',
-            A1: 'A1.mp3',
-            C2: 'C2.mp3',
-            'D#2': 'Ds2.mp3',
-            'F#2': 'Fs2.mp3',
-            A2: 'A2.mp3',
-            C3: 'C3.mp3',
-            'D#3': 'Ds3.mp3',
-            'F#3': 'Fs3.mp3',
-            A3: 'A3.mp3',
-            C4: 'C4.mp3',
-            'D#4': 'Ds4.mp3',
-            'F#4': 'Fs4.mp3',
-            A4: 'A4.mp3',
-            C5: 'C5.mp3',
-            'D#5': 'Ds5.mp3',
-            'F#5': 'Fs5.mp3',
-            A5: 'A5.mp3',
-            C6: 'C6.mp3',
-            'D#6': 'Ds6.mp3',
-            'F#6': 'Fs6.mp3',
-            A6: 'A6.mp3',
-            C7: 'C7.mp3',
-            'D#7': 'Ds7.mp3',
-            'F#7': 'Fs7.mp3',
-            A7: 'A7.mp3',
-            C8: 'C8.mp3',
-          },
-          baseUrl: '/music-practice/audio/',
-          onload: () => {
-            loadedRef.current = true;
-            setIsLoading(false);
-          },
-        }).toDestination();
-        pianoRef.current.volume.value = -10;
-      }
-    };
-    
-    preloadPiano();
-  }, []);
-
-  const startAudioContext = useCallback(async () => {
-    if (!audioContextStartedRef.current) {
-      // Resume audio context if suspended (required for mobile)
-      const context = Tone.getContext();
-      if (context.state === 'suspended') {
-        await context.resume();
-      }
-      // Start Tone.js
-      await Tone.start();
-      audioContextStartedRef.current = true;
+  const getCtx = useCallback((): any => {
+    if (!audioCtxRef.current) {
+      audioCtxRef.current = (Taro as any).createWebAudioContext();
     }
+    return audioCtxRef.current;
   }, []);
 
   const stopAll = useCallback(() => {
-    if (pianoRef.current) {
-      pianoRef.current.releaseAll();
-    }
-    Tone.Transport.stop();
-    Tone.Transport.cancel();
+    const ctx = audioCtxRef.current;
+    if (!ctx) return;
+    activeNodesRef.current.forEach(({ oscillator, gain }) => {
+      try {
+        gain.gain.cancelScheduledValues(ctx.currentTime);
+        gain.gain.setValueAtTime(0, ctx.currentTime);
+        oscillator.stop(ctx.currentTime);
+      } catch (_) {}
+    });
+    activeNodesRef.current = [];
   }, []);
 
-  const ensurePiano = useCallback(async () => {
-    await startAudioContext();
-    
-    // Wait for samples to load if not ready yet (up to 10s)
-    if (!loadedRef.current) {
-      await Tone.loaded();
-    }
-    
-    if (!pianoRef.current) {
-      throw new Error('Piano sampler not initialized');
-    }
-    
-    return pianoRef.current;
-  }, [startAudioContext]);
+  const scheduleTone = useCallback(
+    (note: string, durationSec: number, startTime: number) => {
+      const ctx = getCtx();
+      const freq = noteToFrequency(note);
+
+      const osc = ctx.createOscillator();
+      const gain = ctx.createGain();
+
+      osc.type = 'triangle';
+      osc.frequency.setValueAtTime(freq, startTime);
+
+      // Piano-like ADSR envelope
+      gain.gain.setValueAtTime(0, startTime);
+      gain.gain.linearRampToValueAtTime(0.5, startTime + 0.01);
+      gain.gain.exponentialRampToValueAtTime(0.1, startTime + durationSec * 0.35);
+      gain.gain.exponentialRampToValueAtTime(0.001, startTime + durationSec);
+
+      osc.connect(gain);
+      gain.connect(ctx.destination);
+      osc.start(startTime);
+      osc.stop(startTime + durationSec);
+
+      const entry = { oscillator: osc, gain };
+      activeNodesRef.current.push(entry);
+
+      const delayMs = (startTime - ctx.currentTime + durationSec) * 1000 + 200;
+      setTimeout(() => {
+        activeNodesRef.current = activeNodesRef.current.filter(n => n !== entry);
+      }, delayMs);
+    },
+    [getCtx]
+  );
 
   const playInterval = useCallback(
-    async (rootNote: string, semitones: number, difficulty: Difficulty) => {
-      const piano = await ensurePiano();
+    (rootNote: string, semitones: number, difficulty: Difficulty) => {
+      stopAll();
       const config = DIFFICULTY_CONFIGS[difficulty];
-      const durationSec = config.noteDurationMs / 1000;
-      const gapSec = config.gapMs / 1000;
-
-      const note1 = rootNote;
-      const note2 = noteFromSemitone(rootNote, semitones);
-
-      const now = Tone.now();
-      piano.triggerAttackRelease(note1, durationSec, now);
-      piano.triggerAttackRelease(note2, durationSec, now + durationSec + gapSec);
+      const dur = config.noteDurationMs / 1000;
+      const gap = config.gapMs / 1000;
+      const ctx = getCtx();
+      const now = ctx.currentTime;
+      scheduleTone(rootNote, dur, now);
+      scheduleTone(noteFromSemitone(rootNote, semitones), dur, now + dur + gap);
     },
-    [ensurePiano]
+    [getCtx, scheduleTone, stopAll]
   );
 
   const playChord = useCallback(
-    async (rootNote: string, intervals: number[], difficulty: Difficulty) => {
-      const piano = await ensurePiano();
+    (rootNote: string, intervals: number[], difficulty: Difficulty) => {
+      stopAll();
       const config = DIFFICULTY_CONFIGS[difficulty];
-      const durationSec = config.noteDurationMs / 1000;
-
-      const notes = intervals.map(s => noteFromSemitone(rootNote, s));
-      piano.triggerAttackRelease(notes, durationSec);
+      const dur = config.noteDurationMs / 1000;
+      const ctx = getCtx();
+      const now = ctx.currentTime;
+      intervals.forEach(s => scheduleTone(noteFromSemitone(rootNote, s), dur, now));
     },
-    [ensurePiano]
+    [getCtx, scheduleTone, stopAll]
   );
 
   const playArpeggio = useCallback(
-    async (rootNote: string, intervals: number[], difficulty: Difficulty) => {
-      const piano = await ensurePiano();
+    (rootNote: string, intervals: number[], difficulty: Difficulty) => {
+      stopAll();
       const config = DIFFICULTY_CONFIGS[difficulty];
-      const durationSec = config.noteDurationMs / 1000;
-      const gapSec = config.gapMs / 1000;
-
-      const notes = intervals.map(s => noteFromSemitone(rootNote, s));
-      const now = Tone.now();
-      notes.forEach((note, i) => {
-        piano.triggerAttackRelease(note, durationSec, now + i * (durationSec + gapSec));
-      });
+      const dur = config.noteDurationMs / 1000;
+      const gap = config.gapMs / 1000;
+      const ctx = getCtx();
+      const now = ctx.currentTime;
+      intervals.forEach((s, i) =>
+        scheduleTone(noteFromSemitone(rootNote, s), dur, now + i * (dur + gap))
+      );
     },
-    [ensurePiano]
+    [getCtx, scheduleTone, stopAll]
   );
 
   const playNote = useCallback(
-    async (note: string, durationMs = 800) => {
-      const piano = await ensurePiano();
-      piano.triggerAttackRelease(note, durationMs / 1000);
+    (note: string, durationMs = 800) => {
+      const ctx = getCtx();
+      scheduleTone(note, durationMs / 1000, ctx.currentTime);
     },
-    [ensurePiano]
+    [getCtx, scheduleTone]
   );
 
   return { playInterval, playChord, playArpeggio, playNote, stopAll, isLoading };
