@@ -145,7 +145,7 @@ export default function Index() {
   const { playInterval, playChord, playArpeggio, stopAll, isLoading: audioLoading } = useAudio()
   const { progress, recordAnswer, addScore, updateHighestLevel, getMistakes, getWeaknesses, getAccuracyOverTime } = useProgress()
   const { t, language, toggleLanguage } = useI18n()
-  const { isPreloading, preloadProgress, isPreloaded, error, preloadAudio } = useAudioPreloader()
+  const { isPreloading, preloadProgress, loadedCount, totalCount, isPreloaded, error, preloadAudio } = useAudioPreloader()
 
   const handleAnswer   = useCallback((answer: Answer) => { recordAnswer(answer) }, [recordAnswer])
   const handleScoreAdd = useCallback((pts: number) => { addScore(pts) }, [addScore])
@@ -229,7 +229,7 @@ export default function Index() {
         {t.app.earTrainer}
       </Text>
       <Text style={{ color: '#94a3b8', fontSize: '28rpx', textAlign: 'center' as const, marginBottom: '24rpx' }}>
-        Initializing audio system...
+        Loading piano samples...
       </Text>
       
       {/* Progress bar */}
@@ -249,7 +249,7 @@ export default function Index() {
           }} />
         </View>
         <Text style={{ color: '#64748b', fontSize: '24rpx', textAlign: 'center' as const, marginTop: '12rpx' }}>
-          {preloadProgress}%
+          {totalCount > 0 ? `${loadedCount} / ${totalCount}` : `${preloadProgress}%`}
         </Text>
       </View>
 
@@ -260,7 +260,7 @@ export default function Index() {
       )}
 
       <Text style={{ color: '#475569', fontSize: '22rpx', textAlign: 'center' as const }}>
-        Piano samples will load as you play
+        {totalCount > 0 && loadedCount < totalCount ? `Downloading ${totalCount - loadedCount} remaining...` : 'Almost ready...'}
       </Text>
     </View>
   )

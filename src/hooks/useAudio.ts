@@ -262,6 +262,14 @@ export function useAudio() {
     [getCtx, loadSample, scheduleNote]
   )
 
+  const preloadAll = useCallback(
+    (onProgress: (loaded: number, total: number) => void) => {
+      const cache = getCache()
+      return cache.preloadAll(onProgress)
+    },
+    [getCache]
+  )
+
   return { 
     playInterval, 
     playChord, 
@@ -269,6 +277,7 @@ export function useAudio() {
     playNote, 
     stopAll, 
     isLoading,
+    preloadAll,
     getCacheStats: () => cacheRef.current?.getStats() || { cached: 0, loading: 0, total: 30 }
   }
 }

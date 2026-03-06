@@ -154,6 +154,31 @@ export class AudioCache {
     return { cached: this.cache.size, loading: this.loadingPromises.size, total: SAMPLE_FILES.length }
   }
 
+  async preloadAll(onProgress: (loaded: number, total: number) => void): Promise<void> {
+    const files = SAMPLE_FILES.map(s => s.file)
+    const total = files.length
+    let loaded = 0
+    onProgress(loaded, total)
+
+    // Load in batches of 5 to avoid overwhelming the network
+    const BATCH_SIZE = 5
+    for (let i = 0; i < files.length; i += BATCH_SIZE) {
+      const batch = files.slice(i, i + BATCH_SIZE)
+      await Promise.allSettled(
+        batch.map(async file => {
+          try {
+            await this.loadSample(file)
+          } catch (e) {
+            console.warn(`Preload failed for ${file}:`, e)
+          } finally {
+            loaded++
+            onProgress(loaded, total)
+          }
+        })
+      )
+    }
+  }
+
   async getSample(note: string): Promise<{ buffer: AudioBuffer; playbackRate: number } | null> {
     const { file, playbackRate } = findNearestSample(note)
     try {

@@ -1,12 +1,14 @@
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useCallback } from 'react'
 import { useAudio } from './useAudio'
 
 export function useAudioPreloader() {
   const [isPreloading, setIsPreloading] = useState(false)
   const [preloadProgress, setPreloadProgress] = useState(0)
+  const [loadedCount, setLoadedCount] = useState(0)
+  const [totalCount, setTotalCount] = useState(0)
   const [isPreloaded, setIsPreloaded] = useState(false)
   const [error, setError] = useState<string | null>(null)
-  const { getCacheStats } = useAudio()
+  const { preloadAll } = useAudio()
 
   const preloadAudio = useCallback(async () => {
     if (isPreloaded) return true
@@ -16,47 +18,31 @@ export function useAudioPreloader() {
     setPreloadProgress(0)
 
     try {
-      // Just check if cache system is available
-      // Actual loading happens on-demand when samples are first played
-      const stats = getCacheStats()
-      
-      // Simulate preloading progress for UX
-      for (let i = 0; i <= 100; i += 10) {
-        setPreloadProgress(i)
-        await new Promise(resolve => setTimeout(resolve, 50))
-      }
-
+      await preloadAll((loaded, total) => {
+        setLoadedCount(loaded)
+        setTotalCount(total)
+        setPreloadProgress(Math.round((loaded / total) * 100))
+      })
       setIsPreloaded(true)
+      setPreloadProgress(100)
       return true
     } catch (err) {
       console.error('Audio preloader failed:', err)
-      setError('Failed to initialize audio system')
+      setError('Some samples failed to load')
+      setIsPreloaded(true) // proceed anyway
       return false
     } finally {
       setIsPreloading(false)
     }
-  }, [isPreloaded, getCacheStats])
-
-  const preloadWithTimeout = useCallback(async (timeoutMs = 3000) => {
-    const preloadPromise = preloadAudio()
-    const timeoutPromise = new Promise<boolean>((_, reject) => {
-      setTimeout(() => reject(new Error('Preload timeout')), timeoutMs)
-    })
-
-    try {
-      return await Promise.race([preloadPromise, timeoutPromise])
-    } catch (err) {
-      console.warn('Audio preload timed out, continuing without preload')
-      setError('Audio system ready - samples will load on demand')
-      return false
-    }
-  }, [preloadAudio])
+  }, [isPreloaded, preloadAll])
 
   return {
     isPreloading,
     preloadProgress,
+    loadedCount,
+    totalCount,
     isPreloaded,
     error,
-    preloadAudio: preloadWithTimeout
+    preloadAudio
   }
 }
