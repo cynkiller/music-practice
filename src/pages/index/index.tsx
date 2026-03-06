@@ -141,7 +141,7 @@ function AnswerGrid({ options, onSelect, disabled, correctAnswer, userAnswer, sh
 // ─── Main Page ────────────────────────────────────────────────────────────────
 
 export default function Index() {
-  const { playInterval, playChord, playArpeggio, stopAll } = useAudio()
+  const { playInterval, playChord, playArpeggio, stopAll, isLoading: audioLoading } = useAudio()
   const { progress, recordAnswer, addScore, updateHighestLevel, getMistakes, getWeaknesses, getAccuracyOverTime } = useProgress()
   const { t, language, toggleLanguage } = useI18n()
 
@@ -290,23 +290,26 @@ export default function Index() {
             <View style={{ display: 'flex' as const, alignItems: 'center' as const, justifyContent: 'center' as const, gap: '16rpx' }}>
               {status === 'playing' && (
                 <Button
-                  style={{ paddingLeft: '60rpx', paddingRight: '60rpx', paddingTop: '28rpx', paddingBottom: '28rpx', backgroundColor: '#7c3aed', color: '#fff', fontWeight: '700' as const, borderRadius: '24rpx', fontSize: '30rpx' }}
+                  style={{ paddingLeft: '60rpx', paddingRight: '60rpx', paddingTop: '28rpx', paddingBottom: '28rpx', backgroundColor: audioLoading ? '#6366f1' : '#7c3aed', color: '#fff', fontWeight: '700' as const, borderRadius: '24rpx', fontSize: '30rpx' }}
+                  disabled={audioLoading}
                   onClick={() => { stopAll(); handlePlaySound(); startAnswering() }}>
-                  {t.game.playSound}
+                  {audioLoading ? '⏳ Loading...' : t.game.playSound}
                 </Button>
               )}
               {isAnswering && (
                 <>
                   <Button
-                    style={{ paddingLeft: '28rpx', paddingRight: '28rpx', paddingTop: '18rpx', paddingBottom: '18rpx', backgroundColor: '#334155', color: '#f8fafc', borderRadius: '16rpx', fontSize: '26rpx' }}
+                    style={{ paddingLeft: '28rpx', paddingRight: '28rpx', paddingTop: '18rpx', paddingBottom: '18rpx', backgroundColor: audioLoading ? '#475569' : '#334155', color: '#f8fafc', borderRadius: '16rpx', fontSize: '26rpx' }}
+                    disabled={audioLoading}
                     onClick={() => { stopAll(); handlePlaySound() }}>
-                    {t.game.replay}
+                    {audioLoading ? '⏳' : t.game.replay}
                   </Button>
                   {isFeedback && q.type === 'chord' && (
                     <Button
-                      style={{ paddingLeft: '28rpx', paddingRight: '28rpx', paddingTop: '18rpx', paddingBottom: '18rpx', backgroundColor: '#334155', color: '#f8fafc', borderRadius: '16rpx', fontSize: '26rpx' }}
+                      style={{ paddingLeft: '28rpx', paddingRight: '28rpx', paddingTop: '18rpx', paddingBottom: '18rpx', backgroundColor: audioLoading ? '#475569' : '#334155', color: '#f8fafc', borderRadius: '16rpx', fontSize: '26rpx' }}
+                      disabled={audioLoading}
                       onClick={() => { stopAll(); handlePlayArpeggio() }}>
-                      {t.game.playNotes}
+                      {audioLoading ? '⏳' : t.game.playNotes}
                     </Button>
                   )}
                 </>
@@ -398,8 +401,9 @@ export default function Index() {
                         </View>
                       </View>
                       <Button
-                        style={{ paddingLeft: '20rpx', paddingRight: '20rpx', paddingTop: '14rpx', paddingBottom: '14rpx', backgroundColor: '#334155', borderRadius: '12rpx', color: '#94a3b8', fontSize: '24rpx' }}
-                        onClick={() => handleReplay(m)}>{t.review.replay}</Button>
+                        style={{ paddingLeft: '20rpx', paddingRight: '20rpx', paddingTop: '14rpx', paddingBottom: '14rpx', backgroundColor: audioLoading ? '#475569' : '#334155', borderRadius: '12rpx', color: '#94a3b8', fontSize: '24rpx' }}
+                        disabled={audioLoading}
+                        onClick={() => handleReplay(m)}>{audioLoading ? '⏳' : t.review.replay}</Button>
                     </View>
                   ))
                 )}
