@@ -170,60 +170,25 @@ export class AudioCache {
     }
     
     console.log(`Decoding audio data for ${filename}, arrayBuffer length: ${arrayBuffer.byteLength}`)
-    console.log(`ArrayBuffer details:`, {
-      byteLength: arrayBuffer.byteLength,
-      constructor: arrayBuffer.constructor.name,
-      isView: ArrayBuffer.isView(arrayBuffer)
+
+    // WeChat Mini Program's decodeAudioData uses callback API, NOT Promise.
+    // We must wrap it in a Promise manually, otherwise await returns undefined.
+    const audioBuffer = await new Promise<AudioBuffer>((resolve, reject) => {
+      this.ctx.decodeAudioData(
+        arrayBuffer,
+        (buffer: AudioBuffer) => {
+          console.log(`Successfully decoded ${filename}`)
+          resolve(buffer)
+        },
+        (err: any) => {
+          console.error(`decodeAudioData failed for ${filename}:`, err)
+          reject(new Error(`decodeAudioData failed for ${filename}: ${err}`))
+        }
+      )
     })
-    
-    // Try to peek at the first few bytes to check format
-    const uint8Array = new Uint8Array(arrayBuffer.slice(0, 16))
-    console.log(`First 16 bytes:`, Array.from(uint8Array).map(b => b.toString(16).padStart(2, '0')).join(' '))
-    
-    let audioBuffer: AudioBuffer
-    
-    try {
-      // Method 1: Try direct decode
-      console.log(`Attempting direct decode...`)
-      audioBuffer = await this.ctx.decodeAudioData(arrayBuffer)
-      // Check if AudioBuffer is valid (WeChat Mini Program might have different property access)
-      const duration = (audioBuffer as any).duration || audioBuffer.length ? audioBuffer.length / this.ctx.sampleRate : 0
-      const channels = (audioBuffer as any).numberOfChannels || (audioBuffer as any).channelCount || 2
-      
-      console.log(`Successfully decoded ${filename} (direct), duration: ${duration}s, channels: ${channels}`)
-    } catch (decodeError) {
-      console.warn(`Direct decode failed for ${filename}:`, decodeError)
-      
-      try {
-        // Method 2: Try with copy
-        console.log(`Attempting decode with copy...`)
-        const copiedBuffer = arrayBuffer.slice(0)
-        audioBuffer = await this.ctx.decodeAudioData(copiedBuffer)
-        
-        const duration = (audioBuffer as any).duration || audioBuffer.length ? audioBuffer.length / this.ctx.sampleRate : 0
-        const channels = (audioBuffer as any).numberOfChannels || (audioBuffer as any).channelCount || 2
-        
-        console.log(`Successfully decoded ${filename} (copy), duration: ${duration}s, channels: ${channels}`)
-      } catch (copyError) {
-        console.warn(`Copy decode failed for ${filename}:`, copyError)
-        throw new Error(`All decode methods failed for ${filename}: direct=${decodeError}, copy=${copyError}`)
-      }
-    }
-    
-    // Double-check the audioBuffer is valid (use WeChat-compatible checks)
+
     if (!audioBuffer) {
       throw new Error(`AudioBuffer is null for ${filename}`)
-    }
-    
-    // WeChat Mini Program might not expose these properties directly
-    const duration = (audioBuffer as any).duration || audioBuffer.length ? audioBuffer.length / this.ctx.sampleRate : 0
-    const channels = (audioBuffer as any).numberOfChannels || (audioBuffer as any).channelCount || 2
-    
-    if (duration === 0) {
-      console.warn(`AudioBuffer has zero duration for ${filename}, but will proceed anyway`)
-    }
-    if (channels === 0) {
-      console.warn(`AudioBuffer has zero channels for ${filename}, but will proceed anyway`)
     }
 
     // Save to local cache for future use
@@ -253,40 +218,28 @@ export class AudioCache {
 
       // Read file
       const fs = Taro.getFileSystemManager()
-      const data = fs.readFileSync(filePath)
+      const data = fs.readFileSync(filePath) as any
       if (data) {
-        console.log(`Loading ${filename} from cache, data type: ${typeof data}, length: ${(data as any)?.byteLength || (data as any)?.length || 'unknown'}`)
-        
-        // Handle different data formats that might have been saved
+        // Convert to ArrayBuffer regardless of the format returned by readFileSync
         let buffer: ArrayBuffer
-        
         if (data instanceof ArrayBuffer) {
           buffer = data
-        } else if (data instanceof Uint8Array) {
-          buffer = data.buffer
-        } else if (typeof data === 'string') {
-          // Handle base64 string
-          try {
-            const binaryString = atob(data)
-            const bytes = new Uint8Array(binaryString.length)
-            for (let i = 0; i < binaryString.length; i++) {
-              bytes[i] = binaryString.charCodeAt(i)
-            }
-            buffer = bytes.buffer
-          } catch (e) {
-            console.warn(`Failed to decode base64 for ${filename}:`, e)
-            return null
-          }
-        } else if (Array.isArray(data)) {
-          // Handle plain array
-          const uint8Array = new Uint8Array(data)
-          buffer = uint8Array.buffer
+        } else if (data && typeof data === 'object' && data.buffer instanceof ArrayBuffer) {
+          // Uint8Array or similar typed array
+          buffer = data.buffer.slice(data.byteOffset, data.byteOffset + data.byteLength)
         } else {
-          console.warn(`Unknown data type for ${filename}:`, typeof data)
+          console.warn(`Unexpected data format from readFileSync for ${filename}`)
           return null
         }
-        
-        return await this.ctx.decodeAudioData(buffer)
+
+        console.log(`Loaded ${filename} from local cache, decoding...`)
+        return await new Promise<AudioBuffer>((resolve, reject) => {
+          this.ctx.decodeAudioData(
+            buffer,
+            (audioBuffer: AudioBuffer) => resolve(audioBuffer),
+            (err: any) => reject(err)
+          )
+        })
       }
     } catch (e) {
       console.warn(`Failed to load ${filename} from local cache:`, e)
