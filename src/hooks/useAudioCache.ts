@@ -5,6 +5,9 @@ import { useCallback } from 'react'
 // See AUDIO_HOSTING.md for instructions
 const AUDIO_BASE_URL = 'https://tonejs.github.io/audio/salamander' // Replace with actual CDN URL
 
+// Fallback: Use GitHub Pages for demo (you can replace this)
+const FALLBACK_AUDIO_URL = 'https://raw.githubusercontent.com/cynkiller/music-practice/mini-program/public/audio'
+
 // List of all piano samples
 const PIANO_SAMPLE_PATHS = [
   'A0.mp3', 'A1.mp3', 'A2.mp3', 'A3.mp3', 'A4.mp3', 'A5.mp3', 'A6.mp3', 'A7.mp3',
@@ -85,15 +88,43 @@ class AudioCache {
     }
 
     // Download from internet
-    const url = `${AUDIO_BASE_URL}/${filename}`
-    console.log(`Downloading audio sample: ${url}`)
+    const urls = [
+      `${AUDIO_BASE_URL}/${filename}`,
+      `${FALLBACK_AUDIO_URL}/${filename}`
+    ]
     
-    const response = await fetch(url)
-    if (!response.ok) {
-      throw new Error(`Failed to download ${filename}: ${response.status}`)
+    let arrayBuffer: ArrayBuffer | null = null
+    let lastError: Error | null = null
+    
+    for (const url of urls) {
+      try {
+        console.log(`Downloading audio sample: ${url}`)
+        
+        // Use Taro's request API for WeChat Mini Program compatibility
+        const response = await (global as any).Taro.request({
+          url,
+          method: 'GET',
+          responseType: 'arraybuffer',
+          timeout: 10000 // 10 second timeout
+        })
+        
+        if (response.statusCode === 200 && response.data) {
+          arrayBuffer = response.data
+          break
+        } else {
+          throw new Error(`HTTP ${response.statusCode}`)
+        }
+      } catch (error) {
+        console.warn(`Failed to download from ${url}:`, error)
+        lastError = error as Error
+        continue
+      }
     }
-
-    const arrayBuffer = await response.arrayBuffer()
+    
+    if (!arrayBuffer) {
+      throw lastError || new Error(`Failed to download ${filename} from all sources`)
+    }
+    
     const audioBuffer = await this.ctx.decodeAudioData(arrayBuffer)
 
     // Save to local cache for future use
@@ -108,26 +139,42 @@ class AudioCache {
 
   private async loadFromLocalStorage(filename: string): Promise<AudioBuffer | null> {
     try {
-      const wx = (global as any).wx
-      if (!wx) return null
+      const Taro = (global as any).Taro
+      if (!Taro) return null
 
-      const data = wx.getFileSystemManager().readFileSync(`${wx.env.USER_DATA_PATH}/audio/${filename}`)
+      const dirPath = `${Taro.env.USER_DATA_PATH}/audio`
+      const filePath = `${dirPath}/${filename}`
+      
+      // Check if file exists
+      try {
+        const fs = Taro.getFileSystemManager()
+        const stats = fs.statSync(filePath)
+        if (!stats) return null
+      } catch (e) {
+        // File doesn't exist
+        return null
+      }
+
+      // Read file
+      const fs = Taro.getFileSystemManager()
+      const data = fs.readFileSync(filePath)
       if (data) {
         return await this.ctx.decodeAudioData(data)
       }
     } catch (e) {
-      // File doesn't exist or can't be read
+      console.warn(`Failed to load ${filename} from local cache:`, e)
     }
     return null
   }
 
   private async saveToLocalStorage(filename: string, arrayBuffer: ArrayBuffer): Promise<void> {
     try {
-      const wx = (global as any).wx
-      if (!wx) return
+      const Taro = (global as any).Taro
+      if (!Taro) return
 
-      const fs = wx.getFileSystemManager()
-      const dirPath = `${wx.env.USER_DATA_PATH}/audio`
+      const fs = Taro.getFileSystemManager()
+      const dirPath = `${Taro.env.USER_DATA_PATH}/audio`
+      const filePath = `${dirPath}/${filename}`
       
       // Ensure directory exists
       try {
@@ -137,7 +184,7 @@ class AudioCache {
       }
 
       // Save file
-      fs.writeFileSync(`${dirPath}/${filename}`, new Uint8Array(arrayBuffer))
+      fs.writeFileSync(filePath, new Uint8Array(arrayBuffer))
       console.log(`Cached audio sample: ${filename}`)
     } catch (e) {
       console.error(`Failed to save ${filename} to local cache:`, e)
@@ -170,13 +217,17 @@ export function useAudioCache(ctx: AudioContext) {
     const filename = PIANO_SAMPLES[normalizedNote]
     
     if (!filename) {
+      console.warn(`No sample available for note: ${note}`)
       return null
     }
 
     try {
-      return await cache.loadSample(filename)
+      console.log(`Loading sample for ${note} (${filename})`)
+      const buffer = await cache.loadSample(filename)
+      console.log(`Successfully loaded sample for ${note}`)
+      return buffer
     } catch (error) {
-      console.warn(`Failed to load sample for ${note}:`, error)
+      console.error(`Failed to load sample for ${note}:`, error)
       return null
     }
   }, [cache])

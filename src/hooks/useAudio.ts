@@ -39,11 +39,20 @@ export function useAudio() {
   const [isLoading, setIsLoading] = useState(false)
   const activeNodesRef = useRef<Array<{ source?: any; oscillator?: any; gain: any; stopTime: number }>>([])
   const cacheRef = useRef<any>(null)
+  
+  // DEBUG: Force oscillator fallback for testing
+  const FORCE_OSCILLATOR = false // Set to true to test oscillator only
 
   const getCtx = useCallback((): any => {
     if (!audioCtxRef.current) {
-      audioCtxRef.current = (Taro as any).createWebAudioContext()
-      cacheRef.current = useAudioCache(audioCtxRef.current)
+      try {
+        audioCtxRef.current = (Taro as any).createWebAudioContext()
+        console.log('Audio context created successfully')
+        cacheRef.current = useAudioCache(audioCtxRef.current)
+      } catch (error) {
+        console.error('Failed to create audio context:', error)
+        throw error
+      }
     }
     return audioCtxRef.current
   }, [])
@@ -76,36 +85,41 @@ export function useAudio() {
   const scheduleSample = useCallback(
     async (note: string, durationSec: number, startTime: number) => {
       const ctx = getCtx()
-      const cache = getCache()
+      
+      // DEBUG: Force oscillator fallback if enabled
+      if (!FORCE_OSCILLATOR) {
+        const cache = getCache()
 
-      // Try to load cached sample
-      try {
-        const audioBuffer = await cache.getSample(note)
-        if (audioBuffer) {
-          const source = ctx.createBufferSource()
-          source.buffer = audioBuffer
-          
-          const gain = ctx.createGain()
-          gain.gain.setValueAtTime(0, startTime)
-          gain.gain.linearRampToValueAtTime(0.8, startTime + 0.01)
-          gain.gain.exponentialRampToValueAtTime(0.15, startTime + durationSec * 0.35)
-          gain.gain.exponentialRampToValueAtTime(0.001, startTime + durationSec)
+        // Try to load cached sample
+        try {
+          const audioBuffer = await cache.getSample(note)
+          if (audioBuffer) {
+            const source = ctx.createBufferSource()
+            source.buffer = audioBuffer
+            
+            const gain = ctx.createGain()
+            gain.gain.setValueAtTime(0, startTime)
+            gain.gain.linearRampToValueAtTime(0.8, startTime + 0.01)
+            gain.gain.exponentialRampToValueAtTime(0.15, startTime + durationSec * 0.35)
+            gain.gain.exponentialRampToValueAtTime(0.001, startTime + durationSec)
 
-          source.connect(gain)
-          gain.connect(ctx.destination)
-          source.start(startTime)
-          source.stop(startTime + durationSec)
+            source.connect(gain)
+            gain.connect(ctx.destination)
+            source.start(startTime)
+            source.stop(startTime + durationSec)
 
-          const entry = { source, gain, stopTime: startTime + durationSec }
-          activeNodesRef.current.push(entry)
+            const entry = { source, gain, stopTime: startTime + durationSec }
+            activeNodesRef.current.push(entry)
 
-          return source
+            return source
+          }
+        } catch (error) {
+          console.warn(`Failed to load sample for ${note}, falling back to oscillator`, error)
         }
-      } catch (error) {
-        console.warn(`Failed to load sample for ${note}, falling back to oscillator`, error)
       }
 
       // Fallback to oscillator
+      console.log(`Using oscillator fallback for ${note}`)
       const freq = noteToFrequency(note)
       const osc = ctx.createOscillator()
       const gain = ctx.createGain()
@@ -128,7 +142,7 @@ export function useAudio() {
 
       return osc
     },
-    [getCtx, getCache]
+    [getCtx, getCache, FORCE_OSCILLATOR]
   )
 
   const scheduleTone = useCallback(
@@ -203,11 +217,16 @@ export function useAudio() {
   )
 
   const playNote = useCallback(
-    async (note: string, durationMs = 800) => {
+    async (note: string, durationMs: number) => {
+      console.log(`Playing note: ${note} for ${durationMs}ms`)
       setIsLoading(true)
       try {
         const ctx = getCtx()
         await scheduleTone(note, durationMs / 1000, ctx.currentTime)
+        console.log(`Successfully scheduled note: ${note}`)
+      } catch (error) {
+        console.error(`Failed to play note ${note}:`, error)
+        throw error
       } finally {
         setIsLoading(false)
       }
