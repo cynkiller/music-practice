@@ -8,12 +8,12 @@ interface I18nProviderProps {
 
 export function I18nProvider({ children }: I18nProviderProps) {
   const [language, setLanguageState] = useState<Language>(() => {
-    // Try to get saved language from storage, default to 'en'
+    // Try to get saved language from storage, default to 'zh'
     try {
       const saved = (wx as any).getStorageSync('music-practice-language')
-      return saved === 'zh' || saved === 'en' ? saved : 'en'
+      return saved === 'zh' || saved === 'en' ? saved : 'zh'
     } catch {
-      return 'en'
+      return 'zh'
     }
   })
 
