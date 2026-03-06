@@ -176,9 +176,37 @@ export class AudioCache {
       const data = fs.readFileSync(filePath)
       if (data) {
         console.log(`Loading ${filename} from cache, data type: ${typeof data}, length: ${(data as any)?.byteLength || (data as any)?.length || 'unknown'}`)
-        // Simplify type handling - just assert it's the right type
-        // In practice, Taro should return data that can be decoded
-        return await this.ctx.decodeAudioData(data as ArrayBuffer)
+        
+        // Handle different data formats that might have been saved
+        let buffer: ArrayBuffer
+        
+        if (data instanceof ArrayBuffer) {
+          buffer = data
+        } else if (data instanceof Uint8Array) {
+          buffer = data.buffer
+        } else if (typeof data === 'string') {
+          // Handle base64 string
+          try {
+            const binaryString = atob(data)
+            const bytes = new Uint8Array(binaryString.length)
+            for (let i = 0; i < binaryString.length; i++) {
+              bytes[i] = binaryString.charCodeAt(i)
+            }
+            buffer = bytes.buffer
+          } catch (e) {
+            console.warn(`Failed to decode base64 for ${filename}:`, e)
+            return null
+          }
+        } else if (Array.isArray(data)) {
+          // Handle plain array
+          const uint8Array = new Uint8Array(data)
+          buffer = uint8Array.buffer
+        } else {
+          console.warn(`Unknown data type for ${filename}:`, typeof data)
+          return null
+        }
+        
+        return await this.ctx.decodeAudioData(buffer)
       }
     } catch (e) {
       console.warn(`Failed to load ${filename} from local cache:`, e)
@@ -199,11 +227,45 @@ export class AudioCache {
         // Directory might already exist
       }
 
-      // Save file - convert ArrayBuffer to Uint8Array properly
-      const uint8Array = new Uint8Array(arrayBuffer)
-      console.log(`Saving ${filename}, data type: ${typeof uint8Array}, length: ${uint8Array.length}`)
-      fs.writeFileSync(filePath, uint8Array as any)
-      console.log(`Successfully cached audio sample: ${filename}`)
+      // Save file - convert ArrayBuffer to the correct format for Taro
+      console.log(`Saving ${filename}, original ArrayBuffer length: ${arrayBuffer.byteLength}`)
+      
+      // Taro's writeFileSync expects the data to be in a specific format
+      // Try different approaches to find what works
+      try {
+        // Method 0: Try raw ArrayBuffer first
+        fs.writeFileSync(filePath, arrayBuffer)
+        console.log(`Successfully cached audio sample: ${filename} (method 0 - raw ArrayBuffer)`)
+      } catch (e0) {
+        console.warn(`Method 0 failed:`, e0)
+        const uint8Array = new Uint8Array(arrayBuffer)
+        console.log(`Trying with Uint8Array, length: ${uint8Array.length}`)
+        
+        try {
+          // Method 1: Try as Uint8Array directly
+          fs.writeFileSync(filePath, uint8Array as any)
+          console.log(`Successfully cached audio sample: ${filename} (method 1 - Uint8Array)`)
+        } catch (e1) {
+          console.warn(`Method 1 failed:`, e1)
+          try {
+            // Method 2: Convert to base64 string
+            const base64 = btoa(String.fromCharCode(...uint8Array))
+            fs.writeFileSync(filePath, base64)
+            console.log(`Successfully cached audio sample: ${filename} (method 2 - base64)`)
+          } catch (e2) {
+            console.warn(`Method 2 failed:`, e2)
+            try {
+              // Method 3: Convert to plain array
+              const array = Array.from(uint8Array)
+              fs.writeFileSync(filePath, array as any)
+              console.log(`Successfully cached audio sample: ${filename} (method 3 - array)`)
+            } catch (e3) {
+              console.error(`All methods failed for ${filename}:`, e3)
+              throw e3
+            }
+          }
+        }
+      }
     } catch (e) {
       console.error(`Failed to save ${filename} to local cache:`, e)
     }
