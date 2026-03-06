@@ -175,9 +175,10 @@ export class AudioCache {
       const fs = Taro.getFileSystemManager()
       const data = fs.readFileSync(filePath)
       if (data) {
-        // Convert data to ArrayBuffer - use type assertion to avoid complex type checking
-        const buffer = data as ArrayBuffer
-        return await this.ctx.decodeAudioData(buffer)
+        console.log(`Loading ${filename} from cache, data type: ${typeof data}, length: ${(data as any)?.byteLength || (data as any)?.length || 'unknown'}`)
+        // Simplify type handling - just assert it's the right type
+        // In practice, Taro should return data that can be decoded
+        return await this.ctx.decodeAudioData(data as ArrayBuffer)
       }
     } catch (e) {
       console.warn(`Failed to load ${filename} from local cache:`, e)
@@ -198,9 +199,11 @@ export class AudioCache {
         // Directory might already exist
       }
 
-      // Save file
-      fs.writeFileSync(filePath, new Uint8Array(arrayBuffer) as any)
-      console.log(`Cached audio sample: ${filename}`)
+      // Save file - convert ArrayBuffer to Uint8Array properly
+      const uint8Array = new Uint8Array(arrayBuffer)
+      console.log(`Saving ${filename}, data type: ${typeof uint8Array}, length: ${uint8Array.length}`)
+      fs.writeFileSync(filePath, uint8Array as any)
+      console.log(`Successfully cached audio sample: ${filename}`)
     } catch (e) {
       console.error(`Failed to save ${filename} to local cache:`, e)
     }
