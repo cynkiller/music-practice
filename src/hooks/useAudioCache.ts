@@ -22,9 +22,24 @@ const PIANO_SAMPLES: Record<string, string> = {
   // A notes
   'A0': 'A0.mp3', 'A1': 'A1.mp3', 'A2': 'A2.mp3', 'A3': 'A3.mp3',
   'A4': 'A4.mp3', 'A5': 'A5.mp3', 'A6': 'A6.mp3', 'A7': 'A7.mp3',
+  // B notes (use closest available - fall back to A or C)
+  'B1': 'A1.mp3', 'B2': 'A2.mp3', 'B3': 'A3.mp3', 'B4': 'A4.mp3',
+  'B5': 'A5.mp3', 'B6': 'A6.mp3', 'B7': 'A7.mp3',
   // C notes
   'C1': 'C1.mp3', 'C2': 'C2.mp3', 'C3': 'C3.mp3', 'C4': 'C4.mp3',
   'C5': 'C5.mp3', 'C6': 'C6.mp3', 'C7': 'C7.mp3', 'C8': 'C8.mp3',
+  // D notes (use closest available - fall back to C or F#)
+  'D1': 'C1.mp3', 'D2': 'C2.mp3', 'D3': 'C3.mp3', 'D4': 'C4.mp3',
+  'D5': 'C5.mp3', 'D6': 'C6.mp3', 'D7': 'C7.mp3', 'D8': 'C8.mp3',
+  // E notes (use closest available - fall back to C or A)
+  'E1': 'C1.mp3', 'E2': 'C2.mp3', 'E3': 'C3.mp3', 'E4': 'C4.mp3',
+  'E5': 'C5.mp3', 'E6': 'C6.mp3', 'E7': 'C7.mp3', 'E8': 'C8.mp3',
+  // F notes (use closest available - fall back to C or F#)
+  'F1': 'C1.mp3', 'F2': 'C2.mp3', 'F3': 'C3.mp3', 'F4': 'C4.mp3',
+  'F5': 'C5.mp3', 'F6': 'C6.mp3', 'F7': 'C7.mp3', 'F8': 'C8.mp3',
+  // G notes (use closest available - fall back to A or C)
+  'G1': 'A1.mp3', 'G2': 'A2.mp3', 'G3': 'A3.mp3', 'G4': 'A4.mp3',
+  'G5': 'A5.mp3', 'G6': 'A6.mp3', 'G7': 'A7.mp3', 'G8': 'A8.mp3',
   // C#/D♭ notes (using Ds files)
   'C#1': 'Ds1.mp3', 'C#2': 'Ds2.mp3', 'C#3': 'Ds3.mp3', 'C#4': 'Ds4.mp3',
   'C#5': 'Ds5.mp3', 'C#6': 'Ds6.mp3', 'C#7': 'Ds7.mp3',
@@ -42,6 +57,16 @@ const PIANO_SAMPLES: Record<string, string> = {
   // G♭ notes (same as F#)
   'Gb1': 'Fs1.mp3', 'Gb2': 'Fs2.mp3', 'Gb3': 'Fs3.mp3', 'Gb4': 'Fs4.mp3',
   'Gb5': 'Fs5.mp3', 'Gb6': 'Fs6.mp3', 'Gb7': 'Fs7.mp3',
+  // G#/A♭ notes (use closest available)
+  'G#1': 'A1.mp3', 'G#2': 'A2.mp3', 'G#3': 'A3.mp3', 'G#4': 'A4.mp3',
+  'G#5': 'A5.mp3', 'G#6': 'A6.mp3', 'G#7': 'A7.mp3',
+  'Ab1': 'A1.mp3', 'Ab2': 'A2.mp3', 'Ab3': 'A3.mp3', 'Ab4': 'A4.mp3',
+  'Ab5': 'A5.mp3', 'Ab6': 'A6.mp3', 'Ab7': 'A7.mp3',
+  // A♯/B♭ notes (use closest available)
+  'A#1': 'A1.mp3', 'A#2': 'A2.mp3', 'A#3': 'A3.mp3', 'A#4': 'A4.mp3',
+  'A#5': 'A5.mp3', 'A#6': 'A6.mp3', 'A#7': 'A7.mp3',
+  'Bb1': 'A1.mp3', 'Bb2': 'A2.mp3', 'Bb3': 'A3.mp3', 'Bb4': 'A4.mp3',
+  'Bb5': 'A5.mp3', 'Bb6': 'A6.mp3', 'Bb7': 'A7.mp3',
 }
 
 export class AudioCache {
@@ -145,8 +170,20 @@ export class AudioCache {
     }
     
     console.log(`Decoding audio data for ${filename}, arrayBuffer length: ${arrayBuffer.byteLength}`)
-    const audioBuffer = await this.ctx.decodeAudioData(arrayBuffer)
-    console.log(`Successfully decoded ${filename}, duration: ${audioBuffer.duration}s, channels: ${audioBuffer.numberOfChannels}`)
+    let audioBuffer: AudioBuffer
+    
+    try {
+      audioBuffer = await this.ctx.decodeAudioData(arrayBuffer)
+      console.log(`Successfully decoded ${filename}, duration: ${audioBuffer.duration}s, channels: ${audioBuffer.numberOfChannels}`)
+    } catch (decodeError) {
+      console.error(`Failed to decode ${filename}:`, decodeError)
+      throw new Error(`Audio decode failed for ${filename}: ${decodeError}`)
+    }
+    
+    // Double-check the audioBuffer is valid
+    if (!audioBuffer || audioBuffer.duration === 0) {
+      throw new Error(`Invalid audio buffer for ${filename}: duration is ${audioBuffer?.duration}`)
+    }
 
     // Save to local cache for future use
     try {
