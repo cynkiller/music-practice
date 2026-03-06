@@ -144,7 +144,9 @@ export class AudioCache {
       throw lastError || new Error(`Failed to download ${filename} from all sources`)
     }
     
+    console.log(`Decoding audio data for ${filename}, arrayBuffer length: ${arrayBuffer.byteLength}`)
     const audioBuffer = await this.ctx.decodeAudioData(arrayBuffer)
+    console.log(`Successfully decoded ${filename}, duration: ${audioBuffer.duration}s, channels: ${audioBuffer.numberOfChannels}`)
 
     // Save to local cache for future use
     try {

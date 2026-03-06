@@ -95,8 +95,12 @@ export function useAudio() {
 
         // Try to load cached sample
         try {
+          console.log(`Attempting to load sample for ${note}...`)
           const audioBuffer = await cache.getSample(note)
+          console.log(`Sample loading result for ${note}:`, audioBuffer ? `AudioBuffer (${audioBuffer.duration}s, ${audioBuffer.numberOfChannels} channels)` : 'null')
+          
           if (audioBuffer) {
+            console.log(`Creating BufferSource for ${note}...`)
             const source = ctx.createBufferSource()
             source.buffer = audioBuffer
             
@@ -114,7 +118,10 @@ export function useAudio() {
             const entry = { source, gain, stopTime: startTime + durationSec }
             activeNodesRef.current.push(entry)
 
+            console.log(`Successfully scheduled sample playback for ${note}`)
             return source
+          } else {
+            console.log(`No audio buffer returned for ${note}, will use oscillator`)
           }
         } catch (error) {
           console.warn(`Failed to load sample for ${note}, falling back to oscillator`, error)
