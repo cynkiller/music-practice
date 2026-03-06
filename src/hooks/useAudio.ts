@@ -93,21 +93,15 @@ export function useAudio() {
       if (!FORCE_OSCILLATOR) {
         const cache = getCache()
 
-        // Try to load cached sample
+        // Try to load cached sample (returns { buffer, playbackRate } for pitch shifting)
         try {
-          console.log(`Attempting to load sample for ${note}...`)
-          const audioBuffer = await cache.getSample(note)
-          // WeChat Mini Program might have different property access
-      const duration = audioBuffer ? ((audioBuffer as any).duration || audioBuffer.length ? audioBuffer.length / ctx.currentTime : 0) : 0
-      const channels = audioBuffer ? ((audioBuffer as any).numberOfChannels || (audioBuffer as any).channelCount || 2) : 0
-      
-      console.log(`Sample loading result for ${note}:`, audioBuffer ? `AudioBuffer (${duration}s, ${channels} channels)` : 'null')
-          
-          if (audioBuffer) {
-            console.log(`Creating BufferSource for ${note}...`)
+          const sample = await cache.getSample(note)
+          if (sample) {
+            const { buffer: audioBuffer, playbackRate } = sample
             const source = ctx.createBufferSource()
             source.buffer = audioBuffer
-            
+            source.playbackRate.value = playbackRate // pitch shift to correct note
+
             const gain = ctx.createGain()
             gain.gain.setValueAtTime(0, startTime)
             gain.gain.linearRampToValueAtTime(0.8, startTime + 0.01)
@@ -117,18 +111,14 @@ export function useAudio() {
             source.connect(gain)
             gain.connect(ctx.destination)
             source.start(startTime)
-            source.stop(startTime + durationSec)
+            source.stop(startTime + durationSec + 0.1)
 
-            const entry = { source, gain, stopTime: startTime + durationSec }
-            activeNodesRef.current.push(entry)
-
-            console.log(`Successfully scheduled sample playback for ${note}`)
+            activeNodesRef.current.push({ source, gain, stopTime: startTime + durationSec })
+            console.log(`Playing ${note} via sample (rate=${playbackRate.toFixed(4)})`)
             return source
-          } else {
-            console.log(`No audio buffer returned for ${note}, will use oscillator`)
           }
         } catch (error) {
-          console.warn(`Failed to load sample for ${note}, falling back to oscillator`, error)
+          console.warn(`Sample failed for ${note}, using oscillator:`, error)
         }
       }
 
