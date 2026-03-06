@@ -1,4 +1,5 @@
 import { useCallback } from 'react'
+import Taro from '@tarojs/taro'
 
 // Base URL for piano samples (you can host these anywhere)
 // IMPORTANT: Update this URL to point to your audio files
@@ -100,13 +101,31 @@ export class AudioCache {
       try {
         console.log(`Downloading audio sample: ${url}`)
         
-        // Use Taro's request API for WeChat Mini Program compatibility
-        const response = await (global as any).Taro.request({
-          url,
-          method: 'GET',
-          responseType: 'arraybuffer',
-          timeout: 10000 // 10 second timeout
-        })
+        // Try Taro.request first, fallback to fetch if not available
+        let response: any
+        
+        if (Taro && Taro.request) {
+          // Use Taro's request API for WeChat Mini Program compatibility
+          response = await Taro.request({
+            url,
+            method: 'GET',
+            responseType: 'arraybuffer',
+            timeout: 10000 // 10 second timeout
+          })
+        } else {
+          // Fallback to regular fetch (for development/testing)
+          console.log('Taro.request not available, using fetch fallback')
+          const fetchResponse = await fetch(url)
+          if (!fetchResponse.ok) {
+            throw new Error(`HTTP ${fetchResponse.status}`)
+          }
+          response = {
+            statusCode: fetchResponse.status,
+            data: await fetchResponse.arrayBuffer()
+          }
+        }
+        
+        console.log(`Response status: ${response.statusCode}, data length: ${response.data?.byteLength || 0}`)
         
         if (response.statusCode === 200 && response.data) {
           arrayBuffer = response.data
@@ -139,9 +158,6 @@ export class AudioCache {
 
   private async loadFromLocalStorage(filename: string): Promise<AudioBuffer | null> {
     try {
-      const Taro = (global as any).Taro
-      if (!Taro) return null
-
       const dirPath = `${Taro.env.USER_DATA_PATH}/audio`
       const filePath = `${dirPath}/${filename}`
       
@@ -159,7 +175,9 @@ export class AudioCache {
       const fs = Taro.getFileSystemManager()
       const data = fs.readFileSync(filePath)
       if (data) {
-        return await this.ctx.decodeAudioData(data)
+        // Convert data to ArrayBuffer - use type assertion to avoid complex type checking
+        const buffer = data as ArrayBuffer
+        return await this.ctx.decodeAudioData(buffer)
       }
     } catch (e) {
       console.warn(`Failed to load ${filename} from local cache:`, e)
@@ -169,9 +187,6 @@ export class AudioCache {
 
   private async saveToLocalStorage(filename: string, arrayBuffer: ArrayBuffer): Promise<void> {
     try {
-      const Taro = (global as any).Taro
-      if (!Taro) return
-
       const fs = Taro.getFileSystemManager()
       const dirPath = `${Taro.env.USER_DATA_PATH}/audio`
       const filePath = `${dirPath}/${filename}`
@@ -184,7 +199,7 @@ export class AudioCache {
       }
 
       // Save file
-      fs.writeFileSync(filePath, new Uint8Array(arrayBuffer))
+      fs.writeFileSync(filePath, new Uint8Array(arrayBuffer) as any)
       console.log(`Cached audio sample: ${filename}`)
     } catch (e) {
       console.error(`Failed to save ${filename} to local cache:`, e)
