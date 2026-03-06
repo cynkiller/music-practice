@@ -3,7 +3,9 @@ import { View, Text, Button, ScrollView } from '@tarojs/components'
 import { useAudio } from '../../hooks/useAudio'
 import { useProgress } from '../../hooks/useProgress'
 import { useGameState } from '../../hooks/useGameState'
+import { useI18n } from '../../hooks/useI18n'
 import type { Answer, Difficulty, GameState } from '../../types/index'
+import type { Translations } from '../../lib/i18n'
 import { DIFFICULTY_CONFIGS, NOTES, noteFromSemitone } from '../../lib/musicTheory'
 import './index.scss'
 
@@ -66,7 +68,7 @@ function PianoKeyboard({ highlightedNotes, showHints }: { highlightedNotes: stri
 
 // ─── Score Bar ────────────────────────────────────────────────────────────────
 
-function ScoreBar({ state, onQuit }: { state: GameState; onQuit: () => void }) {
+function ScoreBar({ state, onQuit, t }: { state: GameState; onQuit: () => void; t: Translations }) {
   const { score, combo, level, difficulty, questionsAnswered, correctAnswers } = state
   const accuracy = questionsAnswered > 0 ? Math.round((correctAnswers / questionsAnswered) * 100) : 0
   const diffColors: Record<Difficulty, { text: string; bg: string; border: string }> = {
@@ -81,7 +83,7 @@ function ScoreBar({ state, onQuit }: { state: GameState; onQuit: () => void }) {
       <View style={{ display: 'flex' as const, alignItems: 'center' as const, gap: '16rpx', flexWrap: 'wrap' as const }}>
         <View style={{ backgroundColor: dc.bg, borderWidth: 1, borderStyle: 'solid' as const, borderColor: dc.border, borderRadius: '10rpx', paddingLeft: '16rpx', paddingRight: '16rpx', paddingTop: '6rpx', paddingBottom: '6rpx', display: 'flex' as const, gap: '8rpx', alignItems: 'center' as const }}>
           <Text style={{ color: dc.text, fontSize: '22rpx', fontWeight: '700' as const }}>{difficulty.toUpperCase()}</Text>
-          <Text style={{ color: '#94a3b8', fontSize: '22rpx' }}>Lv.{level}</Text>
+          <Text style={{ color: '#94a3b8', fontSize: '22rpx' }}>{t.scoreBar.level}{level}</Text>
         </View>
         <View style={{ display: 'flex' as const, alignItems: 'center' as const, gap: '6rpx' }}>
           <Text style={{ color: '#fbbf24' }}>⚡</Text>
@@ -90,11 +92,11 @@ function ScoreBar({ state, onQuit }: { state: GameState; onQuit: () => void }) {
         {combo > 0 && (
           <View style={{ display: 'flex' as const, alignItems: 'center' as const, gap: '6rpx' }}>
             <Text style={{ color: '#fb923c' }}>🔥</Text>
-            <Text style={{ color: '#fb923c', fontSize: '28rpx', fontWeight: '700' as const }}>x{combo}</Text>
+            <Text style={{ color: '#fb923c', fontSize: '28rpx', fontWeight: '700' as const }}>{t.scoreBar.combo}{combo}</Text>
           </View>
         )}
         <View style={{ display: 'flex' as const, alignItems: 'center' as const, gap: '6rpx' }}>
-          <Text style={{ color: '#64748b' }}>🎯</Text>
+          <Text style={{ color: '#64748b' }}>{t.scoreBar.accuracy}</Text>
           <Text style={{ color: '#94a3b8', fontSize: '24rpx' }}>{accuracy}%</Text>
           <Text style={{ color: '#475569', fontSize: '22rpx' }}>({correctAnswers}/{questionsAnswered})</Text>
         </View>
@@ -102,7 +104,7 @@ function ScoreBar({ state, onQuit }: { state: GameState; onQuit: () => void }) {
       <Text
         style={{ color: '#64748b', fontSize: '26rpx', paddingLeft: '16rpx', paddingRight: '16rpx', paddingTop: '10rpx', paddingBottom: '10rpx' }}
         onClick={onQuit}
-      >Quit</Text>
+      >{t.app.quit}</Text>
     </View>
   )
 }
@@ -141,6 +143,7 @@ function AnswerGrid({ options, onSelect, disabled, correctAnswer, userAnswer, sh
 export default function Index() {
   const { playInterval, playChord, playArpeggio, stopAll } = useAudio()
   const { progress, recordAnswer, addScore, updateHighestLevel, getMistakes, getWeaknesses, getAccuracyOverTime } = useProgress()
+  const { t, language, toggleLanguage } = useI18n()
 
   const handleAnswer   = useCallback((answer: Answer) => { recordAnswer(answer) }, [recordAnswer])
   const handleScoreAdd = useCallback((pts: number) => { addScore(pts) }, [addScore])
@@ -197,9 +200,9 @@ export default function Index() {
     : []
 
   const navItems: { id: 'menu' | 'review' | 'progress'; label: string }[] = [
-    { id: 'menu',     label: '🏠 Play' },
-    { id: 'review',   label: '📋 Review' },
-    { id: 'progress', label: '📊 Stats' },
+    { id: 'menu',     label: t.app.play },
+    { id: 'review',   label: t.app.review },
+    { id: 'progress', label: t.app.stats },
   ]
   const activeNav = isPlaying ? 'menu' : status as 'menu' | 'review' | 'progress'
 
@@ -210,7 +213,7 @@ export default function Index() {
       <View style={{ backgroundColor: '#0f172a', borderBottom: '1rpx solid #1e293b', paddingLeft: '24rpx', paddingRight: '24rpx', paddingTop: '16rpx', paddingBottom: '16rpx', display: 'flex' as const, alignItems: 'center' as const, justifyContent: 'space-between' as const }}>
         <View style={{ display: 'flex' as const, alignItems: 'center' as const, gap: '12rpx' }}>
           <Text style={{ fontSize: '32rpx' }}>🎵</Text>
-          <Text style={{ color: '#f8fafc', fontSize: '32rpx', fontWeight: '700' as const }}>Ear Trainer</Text>
+          <Text style={{ color: '#f8fafc', fontSize: '32rpx', fontWeight: '700' as const }}>{t.app.earTrainer}</Text>
         </View>
         <View style={{ display: 'flex' as const, gap: '4rpx' }}>
           {navItems.map(item => (
@@ -225,9 +228,17 @@ export default function Index() {
             </Text>
           ))}
         </View>
-        <View style={{ display: 'flex' as const, gap: '6rpx', alignItems: 'center' as const }}>
-          <Text style={{ color: '#94a3b8', fontSize: '22rpx' }}>Score:</Text>
-          <Text style={{ color: '#a78bfa', fontSize: '26rpx', fontWeight: '700' as const }}>{progress.totalScore.toLocaleString()}</Text>
+        <View style={{ display: 'flex' as const, gap: '12rpx', alignItems: 'center' as const }}>
+          <Text
+            style={{ fontSize: '24rpx', fontWeight: '600' as const, paddingLeft: '12rpx', paddingRight: '12rpx', paddingTop: '8rpx', paddingBottom: '8rpx', borderRadius: '10rpx', backgroundColor: '#334155', color: '#a78bfa' }}
+            onClick={toggleLanguage}
+          >
+            {language === 'en' ? '中' : 'EN'}
+          </Text>
+          <View style={{ display: 'flex' as const, gap: '6rpx', alignItems: 'center' as const }}>
+            <Text style={{ color: '#94a3b8', fontSize: '22rpx' }}>{t.app.score}:</Text>
+            <Text style={{ color: '#a78bfa', fontSize: '26rpx', fontWeight: '700' as const }}>{progress.totalScore.toLocaleString()}</Text>
+          </View>
         </View>
       </View>
 
@@ -236,13 +247,13 @@ export default function Index() {
         <ScrollView scrollY style={{ flex: 1 }}>
           <View style={{ padding: '40rpx 28rpx', display: 'flex' as const, flexDirection: 'column' as const, alignItems: 'center' as const, gap: '24rpx' }}>
             <View style={{ textAlign: 'center' as const, marginBottom: '12rpx' }}>
-              <Text style={{ color: '#f8fafc', fontSize: '44rpx', fontWeight: '700' as const, display: 'block' as const }}>Choose Difficulty</Text>
-              <Text style={{ color: '#94a3b8', fontSize: '26rpx', marginTop: '8rpx', display: 'block' as const }}>Train your ear with intervals and chords</Text>
+              <Text style={{ color: '#f8fafc', fontSize: '44rpx', fontWeight: '700' as const, display: 'block' as const }}>{t.menu.chooseDifficulty}</Text>
+              <Text style={{ color: '#94a3b8', fontSize: '26rpx', marginTop: '8rpx', display: 'block' as const }}>{t.menu.trainYourEar}</Text>
             </View>
             {([
-              { id: 'easy'   as Difficulty, emoji: '🛡', label: 'Easy',   color: '#4ade80', border: '#166534', bg: '#052e16', desc: 'Basic intervals & triads. Visual hints on keyboard.', levels: '1–10' },
-              { id: 'normal' as Difficulty, emoji: '⚔', label: 'Normal', color: '#fbbf24', border: '#92400e', bg: '#451a03', desc: 'All diatonic intervals & seventh chords. No hints.',   levels: '11–25' },
-              { id: 'hard'   as Difficulty, emoji: '💀', label: 'Hard',   color: '#f87171', border: '#991b1b', bg: '#450a0a', desc: 'Extended chords, altered dominants, compound intervals.', levels: '26–50' },
+              { id: 'easy'   as Difficulty, emoji: '🛡', label: t.menu.easy,   color: '#4ade80', border: '#166534', bg: '#052e16', desc: t.menu.easyDesc, levels: '1–10' },
+              { id: 'normal' as Difficulty, emoji: '⚔', label: t.menu.normal, color: '#fbbf24', border: '#92400e', bg: '#451a03', desc: t.menu.normalDesc, levels: '11–25' },
+              { id: 'hard'   as Difficulty, emoji: '💀', label: t.menu.hard,   color: '#f87171', border: '#991b1b', bg: '#450a0a', desc: t.menu.hardDesc, levels: '26–50' },
             ] as const).map(d => (
               <Button key={d.id}
                 style={{ width: '100%', backgroundColor: d.bg, borderWidth: 2, borderStyle: 'solid' as const, borderColor: d.border, borderRadius: '24rpx', padding: '36rpx', display: 'flex' as const, flexDirection: 'column' as const, alignItems: 'center' as const, gap: '12rpx' }}
@@ -251,8 +262,8 @@ export default function Index() {
                 <Text style={{ color: d.color, fontSize: '36rpx', fontWeight: '700' as const }}>{d.label}</Text>
                 <Text style={{ color: '#94a3b8', fontSize: '24rpx', textAlign: 'center' as const }}>{d.desc}</Text>
                 <View style={{ display: 'flex' as const, alignItems: 'center' as const, gap: '16rpx', marginTop: '8rpx' }}>
-                  <Text style={{ color: '#64748b', fontSize: '24rpx' }}>Levels {d.levels}</Text>
-                  <Text style={{ color: '#a78bfa', fontSize: '24rpx', fontWeight: '500' as const }}>Lv.{progress.highestLevel[d.id]}</Text>
+                  <Text style={{ color: '#64748b', fontSize: '24rpx' }}>{t.menu.levels} {d.levels}</Text>
+                  <Text style={{ color: '#a78bfa', fontSize: '24rpx', fontWeight: '500' as const }}>{t.menu.best}: {progress.highestLevel[d.id]}</Text>
                 </View>
               </Button>
             ))}
@@ -265,11 +276,11 @@ export default function Index() {
         <ScrollView scrollY style={{ flex: 1 }}>
           <View style={{ padding: '24rpx', display: 'flex' as const, flexDirection: 'column' as const, gap: '24rpx' }}>
 
-            <ScoreBar state={state} onQuit={() => { stopAll(); goToMenu() }} />
+            <ScoreBar state={state} onQuit={() => { stopAll(); goToMenu() }} t={t} />
 
             <View style={{ textAlign: 'center' as const }}>
               <Text style={{ color: '#64748b', fontSize: '22rpx', textTransform: 'uppercase' as const, letterSpacing: '2rpx' }}>
-                Identify the {q.type}
+                {t.game.identifyThe} {q.type === 'interval' ? t.game.interval : t.game.chord}
               </Text>
             </View>
 
@@ -281,7 +292,7 @@ export default function Index() {
                 <Button
                   style={{ paddingLeft: '60rpx', paddingRight: '60rpx', paddingTop: '28rpx', paddingBottom: '28rpx', backgroundColor: '#7c3aed', color: '#fff', fontWeight: '700' as const, borderRadius: '24rpx', fontSize: '30rpx' }}
                   onClick={() => { stopAll(); handlePlaySound(); startAnswering() }}>
-                  ▶  Play Sound
+                  {t.game.playSound}
                 </Button>
               )}
               {isAnswering && (
@@ -289,13 +300,13 @@ export default function Index() {
                   <Button
                     style={{ paddingLeft: '28rpx', paddingRight: '28rpx', paddingTop: '18rpx', paddingBottom: '18rpx', backgroundColor: '#334155', color: '#f8fafc', borderRadius: '16rpx', fontSize: '26rpx' }}
                     onClick={() => { stopAll(); handlePlaySound() }}>
-                    🔊  Replay
+                    {t.game.replay}
                   </Button>
                   {isFeedback && q.type === 'chord' && (
                     <Button
                       style={{ paddingLeft: '28rpx', paddingRight: '28rpx', paddingTop: '18rpx', paddingBottom: '18rpx', backgroundColor: '#334155', color: '#f8fafc', borderRadius: '16rpx', fontSize: '26rpx' }}
                       onClick={() => { stopAll(); handlePlayArpeggio() }}>
-                      🎵  Play Notes
+                      {t.game.playNotes}
                     </Button>
                   )}
                 </>
@@ -320,18 +331,18 @@ export default function Index() {
                 <View style={{ paddingLeft: '40rpx', paddingRight: '40rpx', paddingTop: '24rpx', paddingBottom: '24rpx', borderRadius: '16rpx', textAlign: 'center' as const, backgroundColor: lastAnswer.isCorrect ? '#052e16' : '#450a0a', borderWidth: 1, borderStyle: 'solid' as const, borderColor: lastAnswer.isCorrect ? '#059669' : '#dc2626' }}>
                   {lastAnswer.isCorrect ? (
                     <Text style={{ color: '#6ee7b7', fontSize: '28rpx', fontWeight: '700' as const }}>
-                      Correct! +{state.score - prevScoreRef.current}
+                      {t.game.correct} {t.game.correctPoints.replace('{points}', String(state.score - prevScoreRef.current))}
                     </Text>
                   ) : (
                     <Text style={{ color: '#fca5a5', fontSize: '28rpx' }}>
-                      The answer was <Text style={{ fontWeight: '700' as const }}>{q.targetName}</Text>
+                      {t.game.theAnswerWas} <Text style={{ fontWeight: '700' as const }}>{q.targetName}</Text>
                     </Text>
                   )}
                 </View>
                 <Button
                   style={{ paddingLeft: '40rpx', paddingRight: '40rpx', paddingTop: '24rpx', paddingBottom: '24rpx', backgroundColor: '#7c3aed', color: '#fff', fontWeight: '600' as const, borderRadius: '16rpx', fontSize: '28rpx' }}
                   onClick={() => { stopAll(); nextQuestion() }}>
-                  →  Next Question
+                  {t.game.nextQuestion}
                 </Button>
               </View>
             )}
@@ -350,10 +361,10 @@ export default function Index() {
 
               <View>
                 <Text style={{ color: '#f8fafc', fontSize: '34rpx', fontWeight: '700' as const, marginBottom: '20rpx', display: 'block' as const }}>
-                  ⚠️  Areas to Improve
+                  {t.review.areasToImprove}
                 </Text>
                 {weaknesses.length === 0 ? (
-                  <Text style={{ color: '#64748b', fontSize: '26rpx' }}>No mistakes recorded yet. Start playing!</Text>
+                  <Text style={{ color: '#64748b', fontSize: '26rpx' }}>{t.review.noMistakesRecorded}</Text>
                 ) : (
                   <View style={{ display: 'flex' as const, flexWrap: 'wrap' as const, gap: '14rpx' }}>
                     {weaknesses.map(w => (
@@ -368,10 +379,10 @@ export default function Index() {
 
               <View>
                 <Text style={{ color: '#f8fafc', fontSize: '34rpx', fontWeight: '700' as const, marginBottom: '20rpx', display: 'block' as const }}>
-                  Recent Mistakes
+                  {t.review.recentMistakes}
                 </Text>
                 {recent.length === 0 ? (
-                  <Text style={{ color: '#64748b', fontSize: '26rpx' }}>No mistakes yet!</Text>
+                  <Text style={{ color: '#64748b', fontSize: '26rpx' }}>{t.review.noMistakesYet}</Text>
                 ) : (
                   recent.map((m, i) => (
                     <View key={`${m.questionId}-${i}`} style={{ backgroundColor: '#1e293b', borderWidth: 1, borderStyle: 'solid' as const, borderColor: '#334155', borderRadius: '16rpx', paddingLeft: '24rpx', paddingRight: '24rpx', paddingTop: '18rpx', paddingBottom: '18rpx', marginBottom: '12rpx', display: 'flex' as const, justifyContent: 'space-between' as const, alignItems: 'center' as const, gap: '16rpx' }}>
@@ -388,7 +399,7 @@ export default function Index() {
                       </View>
                       <Button
                         style={{ paddingLeft: '20rpx', paddingRight: '20rpx', paddingTop: '14rpx', paddingBottom: '14rpx', backgroundColor: '#334155', borderRadius: '12rpx', color: '#94a3b8', fontSize: '24rpx' }}
-                        onClick={() => handleReplay(m)}>🔊</Button>
+                        onClick={() => handleReplay(m)}>{t.review.replay}</Button>
                     </View>
                   ))
                 )}
@@ -412,10 +423,10 @@ export default function Index() {
               {/* Stats grid */}
               <View style={{ display: 'flex' as const, flexWrap: 'wrap' as const, gap: '16rpx' }}>
                 {([
-                  { emoji: '🏆', label: 'Total Score', value: progress.totalScore.toLocaleString(), color: '#a78bfa' },
-                  { emoji: '📈', label: 'Accuracy',    value: `${accuracy}%`,                       color: '#4ade80' },
-                  { emoji: '⏱',  label: 'Questions',   value: String(progress.totalQuestionsAnswered), color: '#fbbf24' },
-                  { emoji: '✅', label: 'Correct',     value: String(progress.totalCorrect),         color: '#60a5fa' },
+                  { emoji: '🏆', label: t.progress.totalScore, value: progress.totalScore.toLocaleString(), color: '#a78bfa' },
+                  { emoji: '📈', label: t.progress.accuracy,    value: `${accuracy}%`,                       color: '#4ade80' },
+                  { emoji: '⏱',  label: t.progress.questions,   value: String(progress.totalQuestionsAnswered), color: '#fbbf24' },
+                  { emoji: '✅', label: t.progress.correct,     value: String(progress.totalCorrect),         color: '#60a5fa' },
                 ] as const).map(s => (
                   <View key={s.label} style={{ width: 'calc(50% - 8rpx)', backgroundColor: '#1e293b', borderWidth: 1, borderStyle: 'solid' as const, borderColor: '#334155', borderRadius: '16rpx', padding: '24rpx', display: 'flex' as const, flexDirection: 'column' as const, gap: '10rpx' }}>
                     <View style={{ display: 'flex' as const, alignItems: 'center' as const, gap: '10rpx' }}>
@@ -429,16 +440,16 @@ export default function Index() {
 
               {/* Highest levels */}
               <View style={{ backgroundColor: '#1e293b', borderWidth: 1, borderStyle: 'solid' as const, borderColor: '#334155', borderRadius: '16rpx', padding: '28rpx' }}>
-                <Text style={{ color: '#f8fafc', fontSize: '30rpx', fontWeight: '700' as const, marginBottom: '20rpx', display: 'block' as const }}>Highest Levels</Text>
+                <Text style={{ color: '#f8fafc', fontSize: '30rpx', fontWeight: '700' as const, marginBottom: '20rpx', display: 'block' as const }}>{t.progress.highestLevels}</Text>
                 <View style={{ display: 'flex' as const, gap: '32rpx' }}>
                   {([
-                    { key: 'easy'   as Difficulty, label: 'Easy',   color: '#4ade80' },
-                    { key: 'normal' as Difficulty, label: 'Normal', color: '#fbbf24' },
-                    { key: 'hard'   as Difficulty, label: 'Hard',   color: '#f87171' },
+                    { key: 'easy'   as Difficulty, label: t.menu.easy,   color: '#4ade80' },
+                    { key: 'normal' as Difficulty, label: t.menu.normal, color: '#fbbf24' },
+                    { key: 'hard'   as Difficulty, label: t.menu.hard,   color: '#f87171' },
                   ] as const).map(d => (
                     <View key={d.key} style={{ display: 'flex' as const, gap: '8rpx', alignItems: 'center' as const }}>
                       <Text style={{ color: d.color, fontSize: '24rpx', fontWeight: '500' as const }}>{d.label}:</Text>
-                      <Text style={{ color: '#f8fafc', fontSize: '24rpx', fontWeight: '700' as const }}>Lv.{progress.highestLevel[d.key]}</Text>
+                      <Text style={{ color: '#f8fafc', fontSize: '24rpx', fontWeight: '700' as const }}>{t.scoreBar.level}{progress.highestLevel[d.key]}</Text>
                     </View>
                   ))}
                 </View>
@@ -447,7 +458,7 @@ export default function Index() {
               {/* Accuracy trend bar chart */}
               {accuracyTrend.length > 1 && (
                 <View style={{ backgroundColor: '#1e293b', borderWidth: 1, borderStyle: 'solid' as const, borderColor: '#334155', borderRadius: '16rpx', padding: '28rpx' }}>
-                  <Text style={{ color: '#f8fafc', fontSize: '30rpx', fontWeight: '700' as const, marginBottom: '20rpx', display: 'block' as const }}>Accuracy Over Time</Text>
+                  <Text style={{ color: '#f8fafc', fontSize: '30rpx', fontWeight: '700' as const, marginBottom: '20rpx', display: 'block' as const }}>{t.progress.accuracyOverTime}</Text>
                   <View style={{ display: 'flex' as const, alignItems: 'flex-end' as const, gap: '4rpx', height: '160rpx' }}>
                     {accuracyTrend.map((b, i) => (
                       <View key={i} style={{ flex: 1, display: 'flex' as const, flexDirection: 'column' as const, alignItems: 'center' as const, justifyContent: 'flex-end' as const, height: '100%' }}>
@@ -457,8 +468,8 @@ export default function Index() {
                     ))}
                   </View>
                   <View style={{ display: 'flex' as const, justifyContent: 'space-between' as const, marginTop: '8rpx' }}>
-                    <Text style={{ color: '#64748b', fontSize: '20rpx' }}>Older</Text>
-                    <Text style={{ color: '#64748b', fontSize: '20rpx' }}>Recent</Text>
+                    <Text style={{ color: '#64748b', fontSize: '20rpx' }}>{t.progress.older}</Text>
+                    <Text style={{ color: '#64748b', fontSize: '20rpx' }}>{t.progress.recent}</Text>
                   </View>
                 </View>
               )}
@@ -466,7 +477,7 @@ export default function Index() {
               {/* Most missed horizontal bars */}
               {weaknesses.length > 0 && (
                 <View style={{ backgroundColor: '#1e293b', borderWidth: 1, borderStyle: 'solid' as const, borderColor: '#334155', borderRadius: '16rpx', padding: '28rpx' }}>
-                  <Text style={{ color: '#f8fafc', fontSize: '30rpx', fontWeight: '700' as const, marginBottom: '20rpx', display: 'block' as const }}>Most Missed</Text>
+                  <Text style={{ color: '#f8fafc', fontSize: '30rpx', fontWeight: '700' as const, marginBottom: '20rpx', display: 'block' as const }}>{t.progress.mostMissed}</Text>
                   {weaknesses.map(w => (
                     <View key={w.name} style={{ marginBottom: '16rpx' }}>
                       <View style={{ display: 'flex' as const, justifyContent: 'space-between' as const, marginBottom: '6rpx' }}>
@@ -483,8 +494,8 @@ export default function Index() {
 
               {progress.totalQuestionsAnswered === 0 && (
                 <View style={{ textAlign: 'center' as const, paddingTop: '60rpx', paddingBottom: '60rpx' }}>
-                  <Text style={{ color: '#64748b', fontSize: '32rpx', display: 'block' as const }}>No data yet</Text>
-                  <Text style={{ color: '#475569', fontSize: '26rpx', marginTop: '8rpx', display: 'block' as const }}>Start playing to see your progress!</Text>
+                  <Text style={{ color: '#64748b', fontSize: '32rpx', display: 'block' as const }}>{t.progress.noDataYet}</Text>
+                  <Text style={{ color: '#475569', fontSize: '26rpx', marginTop: '8rpx', display: 'block' as const }}>{t.progress.startPlayingToSee}</Text>
                 </View>
               )}
             </View>

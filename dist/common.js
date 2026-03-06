@@ -1,0 +1,1 @@
+"use strict";(wx["webpackJsonp"]=wx["webpackJsonp"]||[]).push([[76],{9929:function(n,t,e){e.d(t,{g:function(){return u},s:function(){return o}});var r=e(6540),u=(0,r.createContext)(null);function o(){var n=(0,r.useContext)(u);if(!n)throw new Error("useI18n must be used within I18nProvider");return n}}}]);
