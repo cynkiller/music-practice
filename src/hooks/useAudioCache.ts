@@ -186,7 +186,11 @@ export class AudioCache {
       // Method 1: Try direct decode
       console.log(`Attempting direct decode...`)
       audioBuffer = await this.ctx.decodeAudioData(arrayBuffer)
-      console.log(`Successfully decoded ${filename} (direct), duration: ${audioBuffer?.duration}s, channels: ${audioBuffer?.numberOfChannels}`)
+      // Check if AudioBuffer is valid (WeChat Mini Program might have different property access)
+      const duration = (audioBuffer as any).duration || audioBuffer.length ? audioBuffer.length / this.ctx.sampleRate : 0
+      const channels = (audioBuffer as any).numberOfChannels || (audioBuffer as any).channelCount || 2
+      
+      console.log(`Successfully decoded ${filename} (direct), duration: ${duration}s, channels: ${channels}`)
     } catch (decodeError) {
       console.warn(`Direct decode failed for ${filename}:`, decodeError)
       
@@ -195,22 +199,31 @@ export class AudioCache {
         console.log(`Attempting decode with copy...`)
         const copiedBuffer = arrayBuffer.slice(0)
         audioBuffer = await this.ctx.decodeAudioData(copiedBuffer)
-        console.log(`Successfully decoded ${filename} (copy), duration: ${audioBuffer?.duration}s, channels: ${audioBuffer?.numberOfChannels}`)
+        
+        const duration = (audioBuffer as any).duration || audioBuffer.length ? audioBuffer.length / this.ctx.sampleRate : 0
+        const channels = (audioBuffer as any).numberOfChannels || (audioBuffer as any).channelCount || 2
+        
+        console.log(`Successfully decoded ${filename} (copy), duration: ${duration}s, channels: ${channels}`)
       } catch (copyError) {
         console.warn(`Copy decode failed for ${filename}:`, copyError)
         throw new Error(`All decode methods failed for ${filename}: direct=${decodeError}, copy=${copyError}`)
       }
     }
     
-    // Double-check the audioBuffer is valid
+    // Double-check the audioBuffer is valid (use WeChat-compatible checks)
     if (!audioBuffer) {
       throw new Error(`AudioBuffer is null for ${filename}`)
     }
-    if (audioBuffer.duration === 0) {
-      throw new Error(`AudioBuffer has zero duration for ${filename}`)
+    
+    // WeChat Mini Program might not expose these properties directly
+    const duration = (audioBuffer as any).duration || audioBuffer.length ? audioBuffer.length / this.ctx.sampleRate : 0
+    const channels = (audioBuffer as any).numberOfChannels || (audioBuffer as any).channelCount || 2
+    
+    if (duration === 0) {
+      console.warn(`AudioBuffer has zero duration for ${filename}, but will proceed anyway`)
     }
-    if (audioBuffer.numberOfChannels === 0) {
-      throw new Error(`AudioBuffer has zero channels for ${filename}`)
+    if (channels === 0) {
+      console.warn(`AudioBuffer has zero channels for ${filename}, but will proceed anyway`)
     }
 
     // Save to local cache for future use

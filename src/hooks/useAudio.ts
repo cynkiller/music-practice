@@ -97,7 +97,11 @@ export function useAudio() {
         try {
           console.log(`Attempting to load sample for ${note}...`)
           const audioBuffer = await cache.getSample(note)
-          console.log(`Sample loading result for ${note}:`, audioBuffer ? `AudioBuffer (${audioBuffer.duration}s, ${audioBuffer.numberOfChannels} channels)` : 'null')
+          // WeChat Mini Program might have different property access
+      const duration = audioBuffer ? ((audioBuffer as any).duration || audioBuffer.length ? audioBuffer.length / ctx.currentTime : 0) : 0
+      const channels = audioBuffer ? ((audioBuffer as any).numberOfChannels || (audioBuffer as any).channelCount || 2) : 0
+      
+      console.log(`Sample loading result for ${note}:`, audioBuffer ? `AudioBuffer (${duration}s, ${channels} channels)` : 'null')
           
           if (audioBuffer) {
             console.log(`Creating BufferSource for ${note}...`)
