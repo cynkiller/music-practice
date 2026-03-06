@@ -3,7 +3,7 @@ import Taro from '@tarojs/taro'
 import type { Difficulty } from '../types/index'
 import { DIFFICULTY_CONFIGS } from '../lib/musicTheory'
 import { noteFromSemitone } from '../lib/musicTheory'
-import { useAudioCache } from './useAudioCache'
+import { AudioCache } from './useAudioCache'
 
 // Convert note name to frequency (for oscillator fallback)
 function noteToFrequency(note: string): number {
@@ -48,7 +48,10 @@ export function useAudio() {
       try {
         audioCtxRef.current = (Taro as any).createWebAudioContext()
         console.log('Audio context created successfully')
-        cacheRef.current = useAudioCache(audioCtxRef.current)
+        // Initialize cache instance (not hook) here
+        if (!cacheRef.current) {
+          cacheRef.current = new AudioCache(audioCtxRef.current)
+        }
       } catch (error) {
         console.error('Failed to create audio context:', error)
         throw error
@@ -60,7 +63,7 @@ export function useAudio() {
   const getCache = useCallback(() => {
     if (!cacheRef.current) {
       const ctx = getCtx()
-      cacheRef.current = useAudioCache(ctx)
+      cacheRef.current = new AudioCache(ctx)
     }
     return cacheRef.current
   }, [getCtx])

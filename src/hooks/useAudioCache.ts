@@ -3,9 +3,9 @@ import { useCallback } from 'react'
 // Base URL for piano samples (you can host these anywhere)
 // IMPORTANT: Update this URL to point to your audio files
 // See AUDIO_HOSTING.md for instructions
-const AUDIO_BASE_URL = 'https://tonejs.github.io/audio/salamander' // Replace with actual CDN URL
+const AUDIO_BASE_URL = 'https://tonejs.github.io/audio/salamander' // Using Tone.js samples as fallback
 
-// Fallback: Use GitHub Pages for demo (you can replace this)
+// Additional fallback: Use GitHub Pages (you can replace this)
 const FALLBACK_AUDIO_URL = 'https://raw.githubusercontent.com/cynkiller/music-practice/mini-program/public/audio'
 
 // List of all piano samples
@@ -43,7 +43,7 @@ const PIANO_SAMPLES: Record<string, string> = {
   'Gb5': 'Fs5.mp3', 'Gb6': 'Fs6.mp3', 'Gb7': 'Fs7.mp3',
 }
 
-class AudioCache {
+export class AudioCache {
   private cache = new Map<string, AudioBuffer>()
   private loadingPromises = new Map<string, Promise<AudioBuffer>>()
   private ctx: AudioContext
@@ -207,12 +207,8 @@ class AudioCache {
       total: PIANO_SAMPLE_PATHS.length
     }
   }
-}
 
-export function useAudioCache(ctx: AudioContext) {
-  const cache = new AudioCache(ctx)
-
-  const getSample = useCallback(async (note: string): Promise<AudioBuffer | null> => {
+  async getSample(note: string): Promise<AudioBuffer | null> {
     const normalizedNote = normalizeNoteName(note)
     const filename = PIANO_SAMPLES[normalizedNote]
     
@@ -223,13 +219,21 @@ export function useAudioCache(ctx: AudioContext) {
 
     try {
       console.log(`Loading sample for ${note} (${filename})`)
-      const buffer = await cache.loadSample(filename)
+      const buffer = await this.loadSample(filename)
       console.log(`Successfully loaded sample for ${note}`)
       return buffer
     } catch (error) {
       console.error(`Failed to load sample for ${note}:`, error)
       return null
     }
+  }
+}
+
+export function useAudioCache(ctx: AudioContext) {
+  const cache = new AudioCache(ctx)
+
+  const getSample = useCallback(async (note: string): Promise<AudioBuffer | null> => {
+    return await cache.getSample(note)
   }, [cache])
 
   const preloadCommon = useCallback(() => {
