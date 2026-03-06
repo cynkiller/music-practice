@@ -160,8 +160,8 @@ export class AudioCache {
     let loaded = 0
     onProgress(loaded, total)
 
-    // Load in batches of 5 to avoid overwhelming the network
-    const BATCH_SIZE = 5
+    // Load in batches of 10 to avoid overwhelming the network
+    const BATCH_SIZE = 10
     for (let i = 0; i < files.length; i += BATCH_SIZE) {
       const batch = files.slice(i, i + BATCH_SIZE)
       await Promise.allSettled(
