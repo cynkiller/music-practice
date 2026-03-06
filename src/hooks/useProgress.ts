@@ -81,15 +81,20 @@ export function useProgress() {
 
   const getWeaknesses = useCallback(() => {
     const mistakes = progress.answers.filter(a => !a.isCorrect);
-    const counts = new Map<string, number>();
+    const counts = new Map<string, { count: number; type: 'interval' | 'chord' }>();
     for (const m of mistakes) {
       const key = m.question.targetName;
-      counts.set(key, (counts.get(key) || 0) + 1);
+      const existing = counts.get(key);
+      if (existing) {
+        existing.count++;
+      } else {
+        counts.set(key, { count: 1, type: m.question.type });
+      }
     }
     return Array.from(counts.entries())
-      .sort((a, b) => b[1] - a[1])
+      .sort((a, b) => b[1].count - a[1].count)
       .slice(0, 10)
-      .map(([name, count]) => ({ name, count }));
+      .map(([name, data]) => ({ name, count: data.count, type: data.type }));
   }, [progress.answers]);
 
   const getAccuracyOverTime = useCallback((bucketCount = 10) => {

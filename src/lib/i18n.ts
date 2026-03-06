@@ -280,8 +280,12 @@ export const translations: Record<Language, Translations> = {
   }
 }
 
-export function translateMusicName(name: string, t: Translations): string {
-  return t.musicTheory.intervals[name] ?? t.musicTheory.chords[name] ?? name
+export function translateMusicName(name: string, t: Translations, context: 'interval' | 'chord'): string {
+  if (context === 'interval') {
+    return t.musicTheory.intervals[name] ?? name
+  } else {
+    return t.musicTheory.chords[name] ?? name
+  }
 }
 
 export function useTranslation(language: Language) {

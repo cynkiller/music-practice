@@ -396,7 +396,7 @@ export default function Index() {
                 correctAnswer={isFeedback ? q.targetName : undefined}
                 userAnswer={isFeedback ? lastAnswer?.userAnswer : undefined}
                 showResult={isFeedback}
-                translateName={name => translateMusicName(name, t)}
+                translateName={name => translateMusicName(name, t, q.type)}
               />
             )}
 
@@ -410,7 +410,7 @@ export default function Index() {
                     </Text>
                   ) : (
                     <Text style={{ color: '#fca5a5', fontSize: '28rpx' }}>
-                      {t.game.theAnswerWas} <Text style={{ fontWeight: '700' as const }}>{translateMusicName(q.targetName, t)}</Text>
+                      {t.game.theAnswerWas} <Text style={{ fontWeight: '700' as const }}>{translateMusicName(q.targetName, t, q.type)}</Text>
                     </Text>
                   )}
                 </View>
@@ -444,7 +444,7 @@ export default function Index() {
                   <View style={{ display: 'flex' as const, flexWrap: 'wrap' as const, gap: '14rpx' }}>
                     {weaknesses.map(w => (
                       <View key={w.name} style={{ width: 'calc(50% - 7rpx)', backgroundColor: '#1e293b', borderWidth: 1, borderStyle: 'solid' as const, borderColor: '#334155', borderRadius: '16rpx', paddingLeft: '20rpx', paddingRight: '20rpx', paddingTop: '16rpx', paddingBottom: '16rpx', display: 'flex' as const, justifyContent: 'space-between' as const, alignItems: 'center' as const }}>
-                        <Text style={{ color: '#f8fafc', fontSize: '24rpx', fontWeight: '500' as const }}>{translateMusicName(w.name, t)}</Text>
+                        <Text style={{ color: '#f8fafc', fontSize: '24rpx', fontWeight: '500' as const }}>{translateMusicName(w.name, t, w.type)}</Text>
                         <Text style={{ color: '#f87171', fontSize: '22rpx', fontWeight: '700' as const }}>{w.count}x</Text>
                       </View>
                     ))}
@@ -467,9 +467,9 @@ export default function Index() {
                           <Text style={{ color: '#475569', fontSize: '20rpx' }}>{m.question.difficulty} · Lv.{m.question.level}</Text>
                         </View>
                         <View style={{ display: 'flex' as const, alignItems: 'center' as const, gap: '12rpx' }}>
-                          <Text style={{ color: '#f87171', fontSize: '26rpx', textDecorationLine: 'line-through' as const }}>{translateMusicName(m.userAnswer, t)}</Text>
+                          <Text style={{ color: '#f87171', fontSize: '26rpx', textDecorationLine: 'line-through' as const }}>{translateMusicName(m.userAnswer, t, m.question.type)}</Text>
                           <Text style={{ color: '#475569' }}>→</Text>
-                          <Text style={{ color: '#4ade80', fontSize: '26rpx', fontWeight: '600' as const }}>{translateMusicName(m.correctAnswer, t)}</Text>
+                          <Text style={{ color: '#4ade80', fontSize: '26rpx', fontWeight: '600' as const }}>{translateMusicName(m.correctAnswer, t, m.question.type)}</Text>
                         </View>
                       </View>
                       <Button
