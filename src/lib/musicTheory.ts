@@ -69,7 +69,7 @@ export const DIFFICULTY_CONFIGS: Record<Difficulty, DifficultyConfig> = {
     chords: easyChords,
     answerOptionCount: 4,
     noteDurationMs: 1200,
-    gapMs: 600,
+    gapMs: 400,
     showKeyboardHints: true,
   },
   normal: {

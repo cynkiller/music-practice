@@ -85,80 +85,71 @@ export function useAudio() {
     activeNodesRef.current = []
   }, [])
 
-  const scheduleSample = useCallback(
-    async (note: string, durationSec: number, startTime: number) => {
-      const ctx = getCtx()
-      
-      // DEBUG: Force oscillator fallback if enabled
-      if (!FORCE_OSCILLATOR) {
-        const cache = getCache()
-
-        // Try to load cached sample (returns { buffer, playbackRate } for pitch shifting)
-        try {
-          const sample = await cache.getSample(note)
-          if (sample) {
-            const { buffer: audioBuffer, playbackRate } = sample
-            const source = ctx.createBufferSource()
-            source.buffer = audioBuffer
-            source.playbackRate.value = playbackRate // pitch shift to correct note
-
-            const gain = ctx.createGain()
-            gain.gain.setValueAtTime(0, startTime)
-            gain.gain.linearRampToValueAtTime(0.8, startTime + 0.01)
-            gain.gain.exponentialRampToValueAtTime(0.15, startTime + durationSec * 0.35)
-            gain.gain.exponentialRampToValueAtTime(0.001, startTime + durationSec)
-
-            source.connect(gain)
-            gain.connect(ctx.destination)
-            source.start(startTime)
-            source.stop(startTime + durationSec + 0.1)
-
-            activeNodesRef.current.push({ source, gain, stopTime: startTime + durationSec })
-            console.log(`Playing ${note} via sample (rate=${playbackRate.toFixed(4)})`)
-            return source
-          }
-        } catch (error) {
-          console.warn(`Sample failed for ${note}, using oscillator:`, error)
-        }
+  // Load a sample (async) - returns loaded data without scheduling
+  const loadSample = useCallback(
+    async (note: string): Promise<{ buffer: AudioBuffer; playbackRate: number } | null> => {
+      if (FORCE_OSCILLATOR) return null
+      const cache = getCache()
+      try {
+        return await cache.getSample(note)
+      } catch (error) {
+        console.warn(`Sample load failed for ${note}:`, error)
+        return null
       }
-
-      // Fallback to oscillator
-      console.log(`Using oscillator fallback for ${note}`)
-      const freq = noteToFrequency(note)
-      const osc = ctx.createOscillator()
-      const gain = ctx.createGain()
-
-      osc.type = 'triangle'
-      osc.frequency.setValueAtTime(freq, startTime)
-
-      gain.gain.setValueAtTime(0, startTime)
-      gain.gain.linearRampToValueAtTime(0.8, startTime + 0.01)
-      gain.gain.exponentialRampToValueAtTime(0.15, startTime + durationSec * 0.35)
-      gain.gain.exponentialRampToValueAtTime(0.001, startTime + durationSec)
-
-      osc.connect(gain)
-      gain.connect(ctx.destination)
-      osc.start(startTime)
-      osc.stop(startTime + durationSec)
-
-      const entry = { oscillator: osc, gain, stopTime: startTime + durationSec }
-      activeNodesRef.current.push(entry)
-
-      return osc
     },
-    [getCtx, getCache, FORCE_OSCILLATOR]
+    [getCache, FORCE_OSCILLATOR]
   )
 
-  const scheduleTone = useCallback(
-    async (note: string, durationSec: number, startTime: number) => {
-      await scheduleSample(note, durationSec, startTime)
-      
-      // Clean up old nodes
+  // Schedule a note (sync) using a pre-loaded sample or oscillator fallback
+  const scheduleNote = useCallback(
+    (note: string, durationSec: number, startTime: number,
+     sample: { buffer: AudioBuffer; playbackRate: number } | null) => {
       const ctx = getCtx()
+
+      if (sample) {
+        const { buffer, playbackRate } = sample
+        const source = ctx.createBufferSource()
+        source.buffer = buffer
+        source.playbackRate.value = playbackRate
+
+        const gain = ctx.createGain()
+        gain.gain.setValueAtTime(0, startTime)
+        gain.gain.linearRampToValueAtTime(0.8, startTime + 0.01)
+        gain.gain.exponentialRampToValueAtTime(0.15, startTime + durationSec * 0.35)
+        gain.gain.exponentialRampToValueAtTime(0.001, startTime + durationSec)
+
+        source.connect(gain)
+        gain.connect(ctx.destination)
+        source.start(startTime)
+        source.stop(startTime + durationSec + 0.1)
+
+        activeNodesRef.current.push({ source, gain, stopTime: startTime + durationSec })
+      } else {
+        // Oscillator fallback
+        const freq = noteToFrequency(note)
+        const osc = ctx.createOscillator()
+        const gain = ctx.createGain()
+
+        osc.type = 'triangle'
+        osc.frequency.setValueAtTime(freq, startTime)
+        gain.gain.setValueAtTime(0, startTime)
+        gain.gain.linearRampToValueAtTime(0.8, startTime + 0.01)
+        gain.gain.exponentialRampToValueAtTime(0.15, startTime + durationSec * 0.35)
+        gain.gain.exponentialRampToValueAtTime(0.001, startTime + durationSec)
+
+        osc.connect(gain)
+        gain.connect(ctx.destination)
+        osc.start(startTime)
+        osc.stop(startTime + durationSec)
+
+        activeNodesRef.current.push({ oscillator: osc, gain, stopTime: startTime + durationSec })
+      }
+
+      // Clean up finished nodes
       const now = ctx.currentTime
-      activeNodesRef.current = activeNodesRef.current.filter(node => node.stopTime > now + 0.1)
+      activeNodesRef.current = activeNodesRef.current.filter(n => n.stopTime > now - 0.1)
     },
-    [getCtx, scheduleSample]
+    [getCtx]
   )
 
   const playInterval = useCallback(
@@ -169,16 +160,20 @@ export function useAudio() {
         const config = DIFFICULTY_CONFIGS[difficulty]
         const dur = config.noteDurationMs / 1000
         const gap = config.gapMs / 1000
-        const ctx = getCtx()
-        const now = ctx.currentTime
-        
-        await scheduleTone(rootNote, dur, now)
-        await scheduleTone(noteFromSemitone(rootNote, semitones), dur, now + dur + gap)
+        const note2 = noteFromSemitone(rootNote, semitones)
+
+        // Pre-load both samples in parallel BEFORE scheduling
+        const [s1, s2] = await Promise.all([loadSample(rootNote), loadSample(note2)])
+
+        // Schedule with fresh timing AFTER loading
+        const now = getCtx().currentTime
+        scheduleNote(rootNote, dur, now + 0.05, s1)
+        scheduleNote(note2, dur, now + 0.05 + dur + gap, s2)
       } finally {
         setIsLoading(false)
       }
     },
-    [getCtx, scheduleTone, stopAll]
+    [getCtx, loadSample, scheduleNote, stopAll]
   )
 
   const playChord = useCallback(
@@ -188,15 +183,19 @@ export function useAudio() {
       try {
         const config = DIFFICULTY_CONFIGS[difficulty]
         const dur = config.noteDurationMs / 1000
-        const ctx = getCtx()
-        const now = ctx.currentTime
-        
-        await Promise.all(intervals.map(s => scheduleTone(noteFromSemitone(rootNote, s), dur, now)))
+        const notes = intervals.map(s => noteFromSemitone(rootNote, s))
+
+        // Pre-load all samples in parallel
+        const samples = await Promise.all(notes.map(n => loadSample(n)))
+
+        // Schedule all notes simultaneously with fresh timing
+        const now = getCtx().currentTime
+        notes.forEach((n, i) => scheduleNote(n, dur, now + 0.05, samples[i]))
       } finally {
         setIsLoading(false)
       }
     },
-    [getCtx, scheduleTone, stopAll]
+    [getCtx, loadSample, scheduleNote, stopAll]
   )
 
   const playArpeggio = useCallback(
@@ -207,35 +206,33 @@ export function useAudio() {
         const config = DIFFICULTY_CONFIGS[difficulty]
         const dur = config.noteDurationMs / 1000
         const gap = config.gapMs / 1000
-        const ctx = getCtx()
-        const now = ctx.currentTime
-        
-        for (let i = 0; i < intervals.length; i++) {
-          await scheduleTone(noteFromSemitone(rootNote, intervals[i]), dur, now + i * (dur + gap))
-        }
+        const notes = intervals.map(s => noteFromSemitone(rootNote, s))
+
+        // Pre-load all samples in parallel
+        const samples = await Promise.all(notes.map(n => loadSample(n)))
+
+        // Schedule all notes in sequence with fresh timing
+        const now = getCtx().currentTime
+        notes.forEach((n, i) => scheduleNote(n, dur, now + 0.05 + i * (dur + gap), samples[i]))
       } finally {
         setIsLoading(false)
       }
     },
-    [getCtx, scheduleTone, stopAll]
+    [getCtx, loadSample, scheduleNote, stopAll]
   )
 
   const playNote = useCallback(
     async (note: string, durationMs: number) => {
-      console.log(`Playing note: ${note} for ${durationMs}ms`)
       setIsLoading(true)
       try {
-        const ctx = getCtx()
-        await scheduleTone(note, durationMs / 1000, ctx.currentTime)
-        console.log(`Successfully scheduled note: ${note}`)
-      } catch (error) {
-        console.error(`Failed to play note ${note}:`, error)
-        throw error
+        const sample = await loadSample(note)
+        const now = getCtx().currentTime
+        scheduleNote(note, durationMs / 1000, now + 0.05, sample)
       } finally {
         setIsLoading(false)
       }
     },
-    [getCtx, scheduleTone]
+    [getCtx, loadSample, scheduleNote]
   )
 
   return { 
