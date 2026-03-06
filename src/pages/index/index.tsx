@@ -4,6 +4,7 @@ import { useAudio } from '../../hooks/useAudio'
 import { useProgress } from '../../hooks/useProgress'
 import { useGameState } from '../../hooks/useGameState'
 import { useI18n } from '../../hooks/useI18n'
+import { useAudioPreloader } from '../../hooks/useAudioPreloader'
 import type { Answer, Difficulty, GameState } from '../../types/index'
 import type { Translations } from '../../lib/i18n'
 import { DIFFICULTY_CONFIGS, NOTES, noteFromSemitone } from '../../lib/musicTheory'
@@ -144,6 +145,7 @@ export default function Index() {
   const { playInterval, playChord, playArpeggio, stopAll, isLoading: audioLoading } = useAudio()
   const { progress, recordAnswer, addScore, updateHighestLevel, getMistakes, getWeaknesses, getAccuracyOverTime } = useProgress()
   const { t, language, toggleLanguage } = useI18n()
+  const { isPreloading, preloadProgress, isPreloaded, error, preloadAudio } = useAudioPreloader()
 
   const handleAnswer   = useCallback((answer: Answer) => { recordAnswer(answer) }, [recordAnswer])
   const handleScoreAdd = useCallback((pts: number) => { addScore(pts) }, [addScore])
@@ -154,6 +156,11 @@ export default function Index() {
 
   const { state, startGame, startAnswering, submitAnswer, nextQuestion, goToMenu, goToReview, goToProgress } =
     useGameState(handleAnswer, handleScoreAdd, handleLevelUp)
+
+  // Preload audio samples on mount
+  useEffect(() => {
+    preloadAudio()
+  }, [preloadAudio])
 
   const { status } = state
   const q          = state.currentQuestion
@@ -206,6 +213,63 @@ export default function Index() {
   ]
   const activeNav = isPlaying ? 'menu' : status as 'menu' | 'review' | 'progress'
 
+  const renderLoadingScreen = () => (
+    <View style={{ 
+      minHeight: '100vh', 
+      backgroundColor: '#0f172a', 
+      display: 'flex' as const, 
+      flexDirection: 'column' as const,
+      alignItems: 'center' as const,
+      justifyContent: 'center' as const,
+      padding: '40rpx',
+      gap: '32rpx'
+    }}>
+      <Text style={{ fontSize: '64rpx' }}>🎵</Text>
+      <Text style={{ color: '#f8fafc', fontSize: '36rpx', fontWeight: '700' as const, textAlign: 'center' as const }}>
+        {t.app.earTrainer}
+      </Text>
+      <Text style={{ color: '#94a3b8', fontSize: '28rpx', textAlign: 'center' as const, marginBottom: '24rpx' }}>
+        Loading piano samples...
+      </Text>
+      
+      {/* Progress bar */}
+      <View style={{ width: '80%', maxWidth: '600rpx' }}>
+        <View style={{ 
+          backgroundColor: '#1e293b', 
+          borderRadius: '12rpx', 
+          height: '16rpx',
+          overflow: 'hidden' as const
+        }}>
+          <View style={{ 
+            backgroundColor: '#7c3aed', 
+            height: '100%', 
+            borderRadius: '12rpx',
+            width: `${preloadProgress}%`,
+            transition: 'width 0.3s ease'
+          }} />
+        </View>
+        <Text style={{ color: '#64748b', fontSize: '24rpx', textAlign: 'center' as const, marginTop: '12rpx' }}>
+          {preloadProgress}%
+        </Text>
+      </View>
+
+      {error && (
+        <Text style={{ color: '#f87171', fontSize: '24rpx', textAlign: 'center' as const, marginTop: '16rpx' }}>
+          {error}
+        </Text>
+      )}
+
+      <Text style={{ color: '#475569', fontSize: '22rpx', textAlign: 'center' as const }}>
+        This will only take a moment...
+      </Text>
+    </View>
+  )
+
+  // Show loading screen during preloading
+  if (isPreloading && !isPreloaded) {
+    return renderLoadingScreen()
+  }
+
   return (
     <View style={{ minHeight: '100vh', backgroundColor: '#0f172a', display: 'flex' as const, flexDirection: 'column' as const }}>
 
@@ -234,6 +298,11 @@ export default function Index() {
             onClick={toggleLanguage}
           >
             {language === 'en' ? '中' : 'EN'}
+          </Text>
+          <Text
+            style={{ fontSize: '20rpx', paddingLeft: '8rpx', paddingRight: '8rpx', paddingTop: '6rpx', paddingBottom: '6rpx', borderRadius: '8rpx', backgroundColor: isPreloaded ? '#052e16' : '#451a03', color: isPreloaded ? '#4ade80' : '#fbbf24' }}
+          >
+            🎹
           </Text>
           <View style={{ display: 'flex' as const, gap: '6rpx', alignItems: 'center' as const }}>
             <Text style={{ color: '#94a3b8', fontSize: '22rpx' }}>{t.app.score}:</Text>
