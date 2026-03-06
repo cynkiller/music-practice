@@ -1,164 +1,128 @@
-# Music Theory Practice Game
+# Music Theory Practice – WeChat Mini Program
 
-A web-based ear training game for practicing music intervals and chord recognition. Features multiple difficulty levels, adaptive learning, and comprehensive progress tracking.
+This branch is the **WeChat Mini Program** version built with **Taro 4.1.11 + React 18**. It delivers the same ear-training gameplay as the web version, but with a native WeChat experience, optimized audio pipeline, and bilingual UI.
 
 ## 🎵 Features
 
-- **Interval Recognition**: Practice identifying musical intervals from minor 2nd to compound intervals
-- **Chord Recognition**: Learn to identify triads, sevenths, extended, and altered chords
-- **Difficulty Modes**: 
-  - Easy (basic intervals & triads with visual hints)
-  - Normal (all diatonic intervals & seventh chords)
-  - Hard (extended chords, altered dominants, compound intervals)
-- **Adaptive Learning**: Questions weighted by your weak areas
-- **Progress Tracking**: Detailed analytics, mistake review, and accuracy charts
-- **Piano Sounds**: Uses Salamander Grand Piano samples for authentic audio
-- **Responsive Design**: Works on desktop and mobile devices
+- **Intervals & Chords**: Minor 2nd → compound intervals; triads, sevenths, extended, altered chords
+- **Three Difficulties**: Easy / Normal / Hard with keyboard hints, answer counts, and tempo tuned per level
+- **Adaptive Learning**: Weak areas appear more often
+- **Progress Tracking**: Local stats, mistake review, accuracy trends
+- **Bilingual UI**: Chinese (default) and English, context-aware music theory terms
+- **Reliable Audio**: Web Audio API + cached samples + oscillator fallback
 
-## 🚀 Quick Start
+## 🧱 Tech Stack (Mini Program)
+
+- **Framework**: Taro 4.1.11 + React 18 (TypeScript)
+- **Platform**: WeChat Mini Program (WeApp)
+- **Audio**: WeChat Web Audio API
+- **Storage**: Taro storage & file system (sample cache + progress)
+- **Styling**: CSS-in-JS via inline styles in Taro components
+
+## 🚀 Setup & Build
 
 ### Prerequisites
-- Node.js 18+ 
-- npm or yarn
+- Node.js 18+
+- npm
+- **WeChat DevTools** installed (for preview/upload)
 
-### Installation
+### Install & Run (WeApp)
 ```bash
-# Clone the repository
-git clone <your-repo-url>
+git clone https://github.com/cynkiller/music-practice.git
 cd music-practice
-
-# Install dependencies
+git checkout mini-program
 npm install
 
-# Start development server
-npm run dev
+# Dev preview (outputs to dist/ for DevTools)
+npm run dev:weapp
+
+# Production build (WeApp)
+npm run build:weapp
 ```
 
-Open http://localhost:5173 in your browser.
+Open the generated `dist/` folder in **WeChat DevTools** to preview or upload.
 
-## 🎮 How to Play
+## 🎮 Gameplay
 
-1. **Choose Difficulty**: Select Easy, Normal, or Hard mode
-2. **Listen**: Click "Play Sound" to hear an interval or chord
-3. **Identify**: Select the correct answer from the options
-4. **Learn**: See correct notes highlighted on the piano keyboard
-5. **Progress**: Level up by meeting accuracy and score thresholds
+1. Choose difficulty (Easy / Normal / Hard)
+2. Tap **Play Sound** to hear interval or chord
+3. Pick the correct answer; keyboard hints show on Easy
+4. Review mistakes; replay examples with audio
+5. Track score, combo, accuracy, and level progression
 
-### Game Mechanics
-- **Scoring**: Points based on difficulty, combo streak, and response speed
-- **Levels**: 50 progressive levels across all difficulties
-- **Mistake Review**: Review wrong answers and replay examples
-- **Analytics**: Track accuracy trends and identify weak areas
+### Difficulty Timing (Mini Program)
+- **Easy**: 1200ms notes, 400ms gaps, 4 options, keyboard hints
+- **Normal**: 1200ms notes, 400ms gaps, 6 options
+- **Hard**: 900ms notes, 250ms gaps, 8 options
 
-## 🛠️ Development
+## 🎵 Audio System (Mini Program)
 
-### Project Structure
+- **Samples**: 30 WAV files (A, C, D#, F# across octaves) with **pitch shifting** for all 88 notes
+- **Caching**: Download-once to local FS; preload with progress bar
+- **Decoding**: WeChat-compatible `decodeAudioData` (callback wrapped in Promise)
+- **Playback**: Web Audio buffer sources with gain envelopes; oscillator fallback if sample fails
+- **Timing**: Near-real-time scheduling (setTimeout) to avoid dropped notes on mobile
+
+## 🌐 Internationalization
+
+- **Default language**: Chinese (zh); toggle to English in header
+- **Context-aware translation**: Intervals vs chords have different terms (e.g., Major 7th → 大七度 for interval, 大七和弦 for chord)
+
+## 📁 Project Structure (Mini Program)
 ```
 src/
-├── components/          # React UI components
-├── hooks/              # Custom React hooks
-├── lib/                # Music theory and game logic
-├── types/              # TypeScript type definitions
-└── App.tsx            # Main application component
+├── components/
+│   └── I18nProvider.tsx      # i18n context
+├── hooks/
+│   ├── useAudio.ts           # Web Audio scheduling & fallback
+│   ├── useAudioCache.ts      # Sample download/cache/decode
+│   ├── useAudioPreloader.ts  # Preload with progress
+│   ├── useGameState.ts       # Game flow
+│   ├── useProgress.ts        # Local stats storage
+│   └── useI18n.ts            # i18n hook
+├── lib/
+│   ├── i18n.ts               # Translations (EN/ZH)
+│   ├── musicTheory.ts        # Intervals/chords definitions
+│   ├── questionGenerator.ts  # Adaptive questions
+│   ├── scoring.ts            # Score calculation
+│   └── levelConfig.ts        # Level tuning
+├── pages/index/              # Main WeApp page
+├── app.tsx / app.config.ts   # Taro app entry & config
+└── config/                   # Taro build configs
 ```
 
-### Available Scripts
+## �️ Scripts
 ```bash
-npm run dev          # Start development server
-npm run build        # Build for production
-npm run preview      # Preview production build
-npm run lint         # Run ESLint
+npm run dev:weapp   # Dev build for WeChat
+npm run build:weapp # Production build for WeChat
+npm run dev:h5      # (Optional) web dev build
+npm run build:h5    # (Optional) web prod build
 ```
 
-### Key Technologies
-- **React 18** with TypeScript
-- **Tone.js** for audio synthesis and piano samples
-- **TailwindCSS** for styling
-- **Recharts** for progress charts
-- **Lucide React** for icons
+## 🚢 Deploy to WeChat
 
-## 📊 Audio System
+1. Run `npm run build:weapp`
+2. Open **WeChat DevTools** → "Mini Program"
+3. Select project root, set `dist/` as the build output
+4. Preview or upload from DevTools
 
-The game uses the **Salamander Grand Piano** samples via Tone.js:
-- Real acoustic piano recordings (A0–C8)
-- Automatic pitch shifting for any note
-- Supports intervals, chords, and arpeggios
-- First load may take 1–2 seconds to download samples
+## � Troubleshooting (Mini Program)
 
-## 🎯 Difficulty Details
+- **No sound / dropped notes**: Ensure preload completes; WeChat allows audio; retry with good network
+- **Slow first play**: Preload samples (built-in loading screen) to avoid on-demand fetch
+- **Language not switching**: Toggle button in header; saved in Taro/WeChat storage
+- **Decode errors**: Uses callback-based decode; falls back to oscillator if sample fails
 
-### Easy (Levels 1–10)
-- **Intervals**: Major 2nd, Major 3rd, Perfect 4th, Perfect 5th, Octave
-- **Chords**: Major, Minor, Diminished triads
-- **Features**: Visual keyboard hints, 4 answer options
+## 🤝 Contributing (mini-program branch)
 
-### Normal (Levels 11–25)
-- **Intervals**: All diatonic intervals
-- **Chords**: All triads and seventh chords
-- **Features**: No hints, 6 answer options
-
-### Hard (Levels 26–50)
-- **Intervals**: All intervals including compound
-- **Chords**: Extended, altered, and complex chords
-- **Features**: 8 answer options, faster tempo
-
-## 📈 Progress Features
-
-- **Session Tracking**: Current game score, combo, accuracy
-- **Historical Data**: All answers saved locally
-- **Weakness Analysis**: Identifies most missed concepts
-- **Accuracy Trends**: Visual charts over time
-- **Mistake Review**: Replay wrong answers with audio
-
-## 🚀 Deployment
-
-### GitHub Pages
-```bash
-# Build and deploy to gh-pages branch
-npm run deploy
-```
-
-Configure GitHub Pages to serve from the `gh-pages` branch.
-
-### Local Build
-```bash
-npm run build
-# Serve the dist/ folder with any static server
-```
-
-## 🤝 Contributing
-
-1. Fork the repository
-2. Create a feature branch
-3. Make your changes
-4. Add tests if applicable
-5. Submit a pull request
+1. Fork and branch from `mini-program`
+2. Make changes and test in **WeChat DevTools**
+3. Submit PR to `mini-program`
 
 ## 📝 License
 
-This project is open source and available under the [MIT License](LICENSE).
-
-## 🎵 Music Theory Reference
-
-- **Intervals**: Distance between two notes measured in semitones
-- **Chords**: Three or more notes played simultaneously
-- **Triads**: Three-note chords (Major, Minor, Diminished, Augmented)
-- **Sevenths**: Four-note chords adding the seventh scale degree
-- **Extended**: Ninth, eleventh, and thirteenth chords
-- **Altered**: Chords with modified fifths or ninths
-
-## 🔧 Troubleshooting
-
-### Audio Issues
-- Ensure browser allows audio playback
-- Check volume settings
-- Wait for piano samples to load on first use
-
-### Performance
-- Clear browser cache if issues persist
-- Check network connection for sample loading
-- Disable browser extensions that may interfere
+MIT License. See [LICENSE](LICENSE).
 
 ---
 
-Built with ❤️ for music learners everywhere.
+Built with ❤️ for WeChat music learners.
