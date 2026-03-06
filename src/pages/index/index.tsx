@@ -1,113 +1,161 @@
-import { useCallback, useRef } from 'react'
+import { useCallback, useEffect, useRef } from 'react'
 import { View, Text, Button, ScrollView } from '@tarojs/components'
 import { useAudio } from '../../hooks/useAudio'
 import { useProgress } from '../../hooks/useProgress'
 import { useGameState } from '../../hooks/useGameState'
-import type { Answer, Difficulty } from '../../types/index'
-import { DIFFICULTY_CONFIGS } from '../../lib/musicTheory'
+import type { Answer, Difficulty, GameState } from '../../types/index'
+import { DIFFICULTY_CONFIGS, NOTES, noteFromSemitone } from '../../lib/musicTheory'
 import './index.scss'
 
-// ─── Styles ────────────────────────────────────────────────────────────────────
+// ─── Piano Keyboard ───────────────────────────────────────────────────────────
 
-const S = {
-  screen: { minHeight: '100vh', backgroundColor: '#0f172a', display: 'flex' as const, flexDirection: 'column' as const },
-  header: { backgroundColor: '#1e293b', padding: '24rpx 32rpx', display: 'flex' as const, alignItems: 'center' as const, justifyContent: 'space-between' as const },
-  headerTitle: { color: '#a78bfa', fontSize: '34rpx', fontWeight: '700' as const },
-  headerScore: { color: '#f8fafc', fontSize: '28rpx' },
-  headerNav: { display: 'flex' as const, gap: '16rpx' },
-  navBtn: { backgroundColor: '#334155', color: '#94a3b8', fontSize: '24rpx', padding: '8rpx 20rpx', borderRadius: '12rpx' },
-  navBtnActive: { backgroundColor: '#4c1d95', color: '#c4b5fd', fontSize: '24rpx', padding: '8rpx 20rpx', borderRadius: '12rpx' },
-  main: { flex: 1, padding: '32rpx 28rpx', display: 'flex' as const, flexDirection: 'column' as const, gap: '32rpx' },
+const BLACK_KEY_INDICES = new Set([1, 3, 6, 8, 10])
+const PIANO_OCTAVES = [3, 4, 5]
 
-  // Menu
-  menuTitle: { color: '#f8fafc', fontSize: '48rpx', fontWeight: '700' as const, textAlign: 'center' as const, marginBottom: '8rpx' },
-  menuSub: { color: '#94a3b8', fontSize: '28rpx', textAlign: 'center' as const, marginBottom: '48rpx' },
-  diffCard: { backgroundColor: '#1e293b', borderRadius: '24rpx', padding: '36rpx', marginBottom: '24rpx', borderWidth: 2, borderStyle: 'solid' as const, borderColor: '#334155' },
-  diffCardEasy: { borderColor: '#059669' },
-  diffCardNormal: { borderColor: '#2563eb' },
-  diffCardHard: { borderColor: '#dc2626' },
-  diffLabel: { fontSize: '36rpx', fontWeight: '700' as const, marginBottom: '8rpx' },
-  diffLabelEasy: { color: '#34d399' },
-  diffLabelNormal: { color: '#60a5fa' },
-  diffLabelHard: { color: '#f87171' },
-  diffDesc: { color: '#94a3b8', fontSize: '26rpx', marginBottom: '24rpx' },
-  diffLevelRow: { display: 'flex' as const, justifyContent: 'space-between' as const, alignItems: 'center' as const },
-  diffLevel: { color: '#64748b', fontSize: '24rpx' },
-  playBtn: { backgroundColor: '#7c3aed', color: '#fff', fontSize: '28rpx', padding: '16rpx 40rpx', borderRadius: '16rpx', fontWeight: '600' as const },
-  playBtnEasy: { backgroundColor: '#059669' },
-  playBtnNormal: { backgroundColor: '#2563eb' },
-  playBtnHard: { backgroundColor: '#dc2626' },
+function getHighlightedNotes(rootNote: string, semitones: number[]): string[] {
+  return semitones.map(s => noteFromSemitone(rootNote, s))
+}
 
-  // Game
-  scoreRow: { display: 'flex' as const, justifyContent: 'space-between' as const, alignItems: 'center' as const, backgroundColor: '#1e293b', borderRadius: '16rpx', padding: '20rpx 28rpx' },
-  scoreBox: { textAlign: 'center' as const },
-  scoreLabel: { color: '#64748b', fontSize: '22rpx', marginBottom: '4rpx' },
-  scoreValue: { color: '#f8fafc', fontSize: '32rpx', fontWeight: '700' as const },
-  quitBtn: { color: '#64748b', fontSize: '26rpx', padding: '8rpx 16rpx' },
+function PianoKeyboard({ highlightedNotes, showHints }: { highlightedNotes: string[]; showHints: boolean }) {
+  const highlightSet = new Set(highlightedNotes)
 
-  questionCard: { backgroundColor: '#1e293b', borderRadius: '24rpx', padding: '40rpx 32rpx', alignItems: 'center' as const, display: 'flex' as const, flexDirection: 'column' as const, gap: '16rpx' },
-  questionType: { color: '#64748b', fontSize: '24rpx', textTransform: 'uppercase' as const, letterSpacing: '2rpx' },
-  questionText: { color: '#f8fafc', fontSize: '34rpx', fontWeight: '600' as const, textAlign: 'center' as const },
-  questionHint: { color: '#7c3aed', fontSize: '26rpx' },
+  const keys: { note: string; isBlack: boolean; noteWithOctave: string }[] = []
+  for (const octave of PIANO_OCTAVES) {
+    for (let i = 0; i < 12; i++) {
+      keys.push({ note: NOTES[i], isBlack: BLACK_KEY_INDICES.has(i), noteWithOctave: `${NOTES[i]}${octave}` })
+    }
+  }
 
-  playBigBtn: { backgroundColor: '#7c3aed', color: '#fff', fontSize: '32rpx', padding: '28rpx 72rpx', borderRadius: '24rpx', fontWeight: '700' as const, width: '100%', textAlign: 'center' as const },
-  controlRow: { display: 'flex' as const, gap: '16rpx', justifyContent: 'center' as const },
-  replayBtn: { backgroundColor: '#334155', color: '#f8fafc', fontSize: '26rpx', padding: '16rpx 32rpx', borderRadius: '16rpx', flex: 1, textAlign: 'center' as const },
+  const totalWhite = keys.filter(k => !k.isBlack).length
+  const wkw = 100 / totalWhite
 
-  answersGrid: { display: 'grid' as const, gridTemplateColumns: 'repeat(2, 1fr)', gap: '16rpx' },
-  answerBtn: { backgroundColor: '#1e293b', color: '#f8fafc', fontSize: '28rpx', padding: '28rpx 16rpx', borderRadius: '16rpx', borderWidth: 2, borderStyle: 'solid' as const, borderColor: '#334155', textAlign: 'center' as const },
-  answerBtnCorrect: { backgroundColor: '#064e3b', borderColor: '#10b981', color: '#6ee7b7' },
-  answerBtnWrong: { backgroundColor: '#450a0a', borderColor: '#ef4444', color: '#fca5a5' },
-  answerBtnDisabled: { backgroundColor: '#0f172a', borderColor: '#1e293b', color: '#334155' },
+  let whiteIndex = 0
+  const keyPositions = keys.map(k => {
+    if (!k.isBlack) {
+      const pos = { ...k, leftPct: whiteIndex * wkw, widthPct: wkw }
+      whiteIndex++
+      return pos
+    }
+    return { ...k, leftPct: (whiteIndex - 0.35) * wkw, widthPct: wkw * 0.7 }
+  })
 
-  feedbackCard: { borderRadius: '16rpx', padding: '24rpx 32rpx', textAlign: 'center' as const },
-  feedbackCorrect: { backgroundColor: '#064e3b', borderWidth: 1, borderStyle: 'solid' as const, borderColor: '#059669' },
-  feedbackWrong: { backgroundColor: '#450a0a', borderWidth: 1, borderStyle: 'solid' as const, borderColor: '#dc2626' },
-  feedbackText: { fontSize: '28rpx', fontWeight: '600' as const },
-  feedbackCorrectText: { color: '#6ee7b7' },
-  feedbackWrongText: { color: '#fca5a5' },
-  nextBtn: { backgroundColor: '#7c3aed', color: '#fff', fontSize: '30rpx', padding: '24rpx 48rpx', borderRadius: '20rpx', fontWeight: '600' as const, textAlign: 'center' as const, width: '100%' },
+  const isHighlighted = (nwo: string) => showHints && highlightSet.has(nwo)
 
-  // Review / Progress
-  sectionTitle: { color: '#f8fafc', fontSize: '36rpx', fontWeight: '700' as const, marginBottom: '24rpx' },
-  emptyText: { color: '#64748b', fontSize: '28rpx', textAlign: 'center' as const, marginTop: '40rpx' },
-  reviewItem: { backgroundColor: '#1e293b', borderRadius: '16rpx', padding: '24rpx', marginBottom: '16rpx' },
-  reviewItemName: { color: '#f8fafc', fontSize: '28rpx', fontWeight: '600' as const, marginBottom: '8rpx' },
-  reviewItemMeta: { color: '#64748b', fontSize: '24rpx', marginBottom: '16rpx' },
-  reviewItemReplay: { backgroundColor: '#334155', color: '#a78bfa', fontSize: '24rpx', padding: '12rpx 24rpx', borderRadius: '12rpx' },
+  return (
+    <View style={{ position: 'relative' as const, height: '130rpx', width: '100%', overflow: 'hidden' as const, borderRadius: '8rpx', backgroundColor: '#0f172a' }}>
+      {keyPositions.filter(k => !k.isBlack).map(k => (
+        <View key={k.noteWithOctave} style={{
+          position: 'absolute' as const, left: `${k.leftPct}%`, top: 0,
+          width: `calc(${k.widthPct}% - 2rpx)`, height: '100%',
+          backgroundColor: isHighlighted(k.noteWithOctave) ? '#a78bfa' : '#f8fafc',
+          borderRadius: '0 0 6rpx 6rpx', borderRight: '2rpx solid #94a3b8',
+        }} />
+      ))}
+      {keyPositions.filter(k => k.isBlack).map(k => (
+        <View key={k.noteWithOctave} style={{
+          position: 'absolute' as const, left: `${k.leftPct}%`, top: 0,
+          width: `${k.widthPct}%`, height: '63%',
+          backgroundColor: isHighlighted(k.noteWithOctave) ? '#7c3aed' : '#1e293b',
+          borderRadius: '0 0 4rpx 4rpx', zIndex: 10,
+          borderLeft: '1rpx solid #0f172a', borderRight: '1rpx solid #0f172a',
+        }} />
+      ))}
+    </View>
+  )
+}
 
-  statRow: { display: 'flex' as const, gap: '16rpx', marginBottom: '16rpx' },
-  statCard: { flex: 1, backgroundColor: '#1e293b', borderRadius: '16rpx', padding: '24rpx', textAlign: 'center' as const },
-  statValue: { color: '#f8fafc', fontSize: '40rpx', fontWeight: '700' as const, marginBottom: '8rpx' },
-  statLabel: { color: '#64748b', fontSize: '22rpx' },
-  weaknessItem: { backgroundColor: '#1e293b', borderRadius: '12rpx', padding: '20rpx 24rpx', marginBottom: '12rpx', display: 'flex' as const, justifyContent: 'space-between' as const, alignItems: 'center' as const },
-  weaknessName: { color: '#f8fafc', fontSize: '28rpx' },
-  weaknessCount: { color: '#ef4444', fontSize: '24rpx' },
-  backBtn: { backgroundColor: '#334155', color: '#94a3b8', fontSize: '28rpx', padding: '20rpx 40rpx', borderRadius: '16rpx', textAlign: 'center' as const },
+// ─── Score Bar ────────────────────────────────────────────────────────────────
+
+function ScoreBar({ state, onQuit }: { state: GameState; onQuit: () => void }) {
+  const { score, combo, level, difficulty, questionsAnswered, correctAnswers } = state
+  const accuracy = questionsAnswered > 0 ? Math.round((correctAnswers / questionsAnswered) * 100) : 0
+  const diffColors: Record<Difficulty, { text: string; bg: string; border: string }> = {
+    easy:   { text: '#4ade80', bg: '#052e16', border: '#166534' },
+    normal: { text: '#fbbf24', bg: '#451a03', border: '#92400e' },
+    hard:   { text: '#f87171', bg: '#450a0a', border: '#991b1b' },
+  }
+  const dc = diffColors[difficulty]
+
+  return (
+    <View style={{ display: 'flex' as const, alignItems: 'center' as const, justifyContent: 'space-between' as const, flexWrap: 'wrap' as const, gap: '10rpx' }}>
+      <View style={{ display: 'flex' as const, alignItems: 'center' as const, gap: '16rpx', flexWrap: 'wrap' as const }}>
+        <View style={{ backgroundColor: dc.bg, borderWidth: 1, borderStyle: 'solid' as const, borderColor: dc.border, borderRadius: '10rpx', paddingLeft: '16rpx', paddingRight: '16rpx', paddingTop: '6rpx', paddingBottom: '6rpx', display: 'flex' as const, gap: '8rpx', alignItems: 'center' as const }}>
+          <Text style={{ color: dc.text, fontSize: '22rpx', fontWeight: '700' as const }}>{difficulty.toUpperCase()}</Text>
+          <Text style={{ color: '#94a3b8', fontSize: '22rpx' }}>Lv.{level}</Text>
+        </View>
+        <View style={{ display: 'flex' as const, alignItems: 'center' as const, gap: '6rpx' }}>
+          <Text style={{ color: '#fbbf24' }}>⚡</Text>
+          <Text style={{ color: '#f8fafc', fontSize: '28rpx', fontWeight: '700' as const }}>{score.toLocaleString()}</Text>
+        </View>
+        {combo > 0 && (
+          <View style={{ display: 'flex' as const, alignItems: 'center' as const, gap: '6rpx' }}>
+            <Text style={{ color: '#fb923c' }}>🔥</Text>
+            <Text style={{ color: '#fb923c', fontSize: '28rpx', fontWeight: '700' as const }}>x{combo}</Text>
+          </View>
+        )}
+        <View style={{ display: 'flex' as const, alignItems: 'center' as const, gap: '6rpx' }}>
+          <Text style={{ color: '#64748b' }}>🎯</Text>
+          <Text style={{ color: '#94a3b8', fontSize: '24rpx' }}>{accuracy}%</Text>
+          <Text style={{ color: '#475569', fontSize: '22rpx' }}>({correctAnswers}/{questionsAnswered})</Text>
+        </View>
+      </View>
+      <Text
+        style={{ color: '#64748b', fontSize: '26rpx', paddingLeft: '16rpx', paddingRight: '16rpx', paddingTop: '10rpx', paddingBottom: '10rpx' }}
+        onClick={onQuit}
+      >Quit</Text>
+    </View>
+  )
+}
+
+// ─── Answer Grid ──────────────────────────────────────────────────────────────
+
+function AnswerGrid({ options, onSelect, disabled, correctAnswer, userAnswer, showResult }: {
+  options: string[]; onSelect: (opt: string) => void; disabled: boolean
+  correctAnswer?: string; userAnswer?: string; showResult: boolean
+}) {
+  function btnStyle(option: string): object {
+    const base = { borderRadius: '16rpx', fontSize: '26rpx', fontWeight: '600' as const, paddingTop: '22rpx', paddingBottom: '22rpx', paddingLeft: '8rpx', paddingRight: '8rpx', borderWidth: 2, borderStyle: 'solid' as const, textAlign: 'center' as const, width: '100%' }
+    if (showResult) {
+      if (option === correctAnswer)  return { ...base, backgroundColor: '#052e16', borderColor: '#10b981', color: '#6ee7b7' }
+      if (option === userAnswer)     return { ...base, backgroundColor: '#450a0a', borderColor: '#ef4444', color: '#fca5a5' }
+      return { ...base, backgroundColor: '#0f172a', borderColor: '#1e293b', color: '#334155' }
+    }
+    return { ...base, backgroundColor: '#1e293b', borderColor: '#475569', color: '#f8fafc' }
+  }
+
+  return (
+    <View style={{ display: 'flex' as const, flexWrap: 'wrap' as const, gap: '14rpx' }}>
+      {options.map(option => (
+        <View key={option} style={{ width: 'calc(50% - 7rpx)' }}>
+          <Button style={btnStyle(option)} disabled={disabled} onClick={() => { if (!disabled) onSelect(option) }}>
+            {option}
+          </Button>
+        </View>
+      ))}
+    </View>
+  )
 }
 
 // ─── Main Page ────────────────────────────────────────────────────────────────
 
 export default function Index() {
   const { playInterval, playChord, playArpeggio, stopAll } = useAudio()
-  const {
-    progress,
-    recordAnswer,
-    addScore,
-    updateHighestLevel,
-    getMistakes,
-    getWeaknesses,
-    getAccuracyOverTime,
-  } = useProgress()
+  const { progress, recordAnswer, addScore, updateHighestLevel, getMistakes, getWeaknesses, getAccuracyOverTime } = useProgress()
 
-  const handleAnswer = useCallback((answer: Answer) => { recordAnswer(answer) }, [recordAnswer])
-  const handleScoreAdd = useCallback((points: number) => { addScore(points) }, [addScore])
-  const handleLevelUp = useCallback((difficulty: Difficulty, level: number) => { updateHighestLevel(difficulty, level) }, [updateHighestLevel])
+  const handleAnswer   = useCallback((answer: Answer) => { recordAnswer(answer) }, [recordAnswer])
+  const handleScoreAdd = useCallback((pts: number) => { addScore(pts) }, [addScore])
+  const handleLevelUp  = useCallback((diff: Difficulty, lv: number) => { updateHighestLevel(diff, lv) }, [updateHighestLevel])
 
-  const prevScoreRef = useRef(0)
+  const prevScoreRef  = useRef(0)
+  const autoPlayedRef = useRef<string | null>(null)
 
   const { state, startGame, startAnswering, submitAnswer, nextQuestion, goToMenu, goToReview, goToProgress } =
     useGameState(handleAnswer, handleScoreAdd, handleLevelUp)
+
+  const { status } = state
+  const q          = state.currentQuestion
+  const lastAnswer = state.sessionAnswers[state.sessionAnswers.length - 1]
+  const config     = DIFFICULTY_CONFIGS[state.difficulty]
 
   const handleSubmitAnswer = useCallback((option: string) => {
     prevScoreRef.current = state.score
@@ -115,303 +163,334 @@ export default function Index() {
   }, [state.score, submitAnswer])
 
   const handlePlaySound = useCallback(() => {
-    if (!state.currentQuestion) return
-    const q = state.currentQuestion
+    if (!q) return
     if (q.type === 'interval') playInterval(q.rootNote, q.semitones[1], state.difficulty)
     else playChord(q.rootNote, q.semitones, state.difficulty)
-  }, [state.currentQuestion, state.difficulty, playInterval, playChord])
+  }, [q, state.difficulty, playInterval, playChord])
 
   const handlePlayArpeggio = useCallback(() => {
-    if (!state.currentQuestion) return
-    const q = state.currentQuestion
+    if (!q) return
     playArpeggio(q.rootNote, q.semitones, state.difficulty)
-  }, [state.currentQuestion, state.difficulty, playArpeggio])
+  }, [q, state.difficulty, playArpeggio])
 
   const handleReplay = useCallback((answer: Answer) => {
-    const q = answer.question
-    if (q.type === 'interval') playInterval(q.rootNote, q.semitones[1], q.difficulty)
-    else playChord(q.rootNote, q.semitones, q.difficulty)
+    const aq = answer.question
+    if (aq.type === 'interval') playInterval(aq.rootNote, aq.semitones[1], aq.difficulty)
+    else playChord(aq.rootNote, aq.semitones, aq.difficulty)
   }, [playInterval, playChord])
 
-  const { status } = state
-  const q = state.currentQuestion
-  const lastAnswer = state.sessionAnswers[state.sessionAnswers.length - 1]
-  const config = DIFFICULTY_CONFIGS[state.difficulty]
+  // Auto-play arpeggio on wrong chord answer — mirrors GameBoard.tsx
+  useEffect(() => {
+    if (status === 'feedback' && lastAnswer && !lastAnswer.isCorrect && q?.type === 'chord' && autoPlayedRef.current !== q.id) {
+      autoPlayedRef.current = q.id
+      const t = setTimeout(() => handlePlayArpeggio(), 600)
+      return () => clearTimeout(t)
+    }
+  }, [status, lastAnswer, q, handlePlayArpeggio])
 
-  // ── Header ──────────────────────────────────────────────────────────────────
+  const isFeedback  = status === 'feedback'
+  const isAnswering = status === 'answering' || isFeedback
+  const isPlaying   = status === 'playing' || isAnswering
+  const showHints   = config.showKeyboardHints
+  const highlightedNotes = (showHints && status === 'answering') || isFeedback
+    ? getHighlightedNotes(q?.rootNote ?? '', q?.semitones ?? [])
+    : []
 
-  const renderHeader = () => (
-    <View style={S.header}>
-      <Text style={S.headerTitle}>🎵 Music Theory</Text>
-      <View style={S.headerNav}>
-        {status !== 'playing' && status !== 'answering' && status !== 'feedback' && (
-          <>
-            <Text
-              style={status === 'menu' ? S.navBtnActive : S.navBtn}
-              onClick={goToMenu}
-            >Menu</Text>
-            <Text
-              style={status === 'review' ? S.navBtnActive : S.navBtn}
-              onClick={goToReview}
-            >Review</Text>
-            <Text
-              style={status === 'progress' ? S.navBtnActive : S.navBtn}
-              onClick={goToProgress}
-            >Stats</Text>
-          </>
-        )}
-        <Text style={S.headerScore}>⭐ {progress.totalScore}</Text>
-      </View>
-    </View>
-  )
-
-  // ── Menu ────────────────────────────────────────────────────────────────────
-
-  const renderMenu = () => {
-    const difficulties: Array<{ key: Difficulty; label: string; desc: string }> = [
-      { key: 'easy', label: '🟢 Easy', desc: 'Basic intervals & triads' },
-      { key: 'normal', label: '🔵 Normal', desc: 'All intervals & seventh chords' },
-      { key: 'hard', label: '🔴 Hard', desc: 'Extended chords & complex intervals' },
-    ]
-    const cardBorder = { easy: S.diffCardEasy, normal: S.diffCardNormal, hard: S.diffCardHard }
-    const labelColor = { easy: S.diffLabelEasy, normal: S.diffLabelNormal, hard: S.diffLabelHard }
-    const btnColor = { easy: S.playBtnEasy, normal: S.playBtnNormal, hard: S.playBtnHard }
-
-    return (
-      <ScrollView scrollY style={{ flex: 1 }}>
-        <View style={S.main}>
-          <Text style={S.menuTitle}>Music Theory</Text>
-          <Text style={S.menuSub}>Train your ear, level up your skills</Text>
-          {difficulties.map(d => (
-            <View key={d.key} style={{ ...S.diffCard, ...cardBorder[d.key] }}>
-              <Text style={{ ...S.diffLabel, ...labelColor[d.key] }}>{d.label}</Text>
-              <Text style={S.diffDesc}>{d.desc}</Text>
-              <View style={S.diffLevelRow}>
-                <Text style={S.diffLevel}>
-                  Best: Level {progress.highestLevel[d.key]}
-                </Text>
-                <Button
-                  style={{ ...S.playBtn, ...btnColor[d.key] }}
-                  onClick={() => startGame(d.key, 1)}
-                >Play →</Button>
-              </View>
-            </View>
-          ))}
-        </View>
-      </ScrollView>
-    )
-  }
-
-  // ── Game Board ───────────────────────────────────────────────────────────────
-
-  const renderGame = () => {
-    if (!q) return null
-    const isAnswering = status === 'answering' || status === 'feedback'
-    const isFeedback = status === 'feedback'
-
-    return (
-      <ScrollView scrollY style={{ flex: 1 }}>
-        <View style={S.main}>
-          {/* Score row */}
-          <View style={S.scoreRow}>
-            <View style={S.scoreBox}>
-              <Text style={S.scoreLabel}>Score</Text>
-              <Text style={S.scoreValue}>{state.score}</Text>
-            </View>
-            <View style={S.scoreBox}>
-              <Text style={S.scoreLabel}>Combo</Text>
-              <Text style={S.scoreValue}>x{state.combo}</Text>
-            </View>
-            <View style={S.scoreBox}>
-              <Text style={S.scoreLabel}>Level</Text>
-              <Text style={S.scoreValue}>{state.level}</Text>
-            </View>
-            <Text style={S.quitBtn} onClick={() => { stopAll(); goToMenu() }}>✕ Quit</Text>
-          </View>
-
-          {/* Question card */}
-          <View style={S.questionCard}>
-            <Text style={S.questionType}>Identify the {q.type}</Text>
-            <Text style={S.questionText}>
-              {isAnswering ? `Root: ${q.rootNote}` : 'Ready to listen?'}
-            </Text>
-            {config.showKeyboardHints && isFeedback && (
-              <Text style={S.questionHint}>{q.targetName}</Text>
-            )}
-          </View>
-
-          {/* Play controls */}
-          {status === 'playing' && (
-            <Button
-              style={S.playBigBtn}
-              onClick={() => { stopAll(); handlePlaySound(); startAnswering() }}
-            >▶ Play Sound</Button>
-          )}
-
-          {isAnswering && (
-            <View style={S.controlRow}>
-              <Button
-                style={S.replayBtn}
-                onClick={() => { stopAll(); handlePlaySound() }}
-              >↺ Replay</Button>
-              {isFeedback && q.type === 'chord' && (
-                <Button
-                  style={S.replayBtn}
-                  onClick={() => { stopAll(); handlePlayArpeggio() }}
-                >♩ Arpeggio</Button>
-              )}
-            </View>
-          )}
-
-          {/* Answer options */}
-          {isAnswering && (
-            <View style={S.answersGrid}>
-              {q.options.map(option => {
-                let btnStyle = { ...S.answerBtn }
-                if (isFeedback) {
-                  if (option === q.targetName) Object.assign(btnStyle, S.answerBtnCorrect)
-                  else if (option === lastAnswer?.userAnswer) Object.assign(btnStyle, S.answerBtnWrong)
-                  else Object.assign(btnStyle, S.answerBtnDisabled)
-                }
-                return (
-                  <Button
-                    key={option}
-                    style={btnStyle}
-                    disabled={isFeedback}
-                    onClick={() => { stopAll(); handleSubmitAnswer(option) }}
-                  >{option}</Button>
-                )
-              })}
-            </View>
-          )}
-
-          {/* Feedback */}
-          {isFeedback && lastAnswer && (
-            <View>
-              <View style={{ ...S.feedbackCard, ...(lastAnswer.isCorrect ? S.feedbackCorrect : S.feedbackWrong) }}>
-                <Text style={{ ...S.feedbackText, ...(lastAnswer.isCorrect ? S.feedbackCorrectText : S.feedbackWrongText) }}>
-                  {lastAnswer.isCorrect
-                    ? `✓ Correct! +${state.score - prevScoreRef.current}pts`
-                    : `✗ The answer was ${q.targetName}`}
-                </Text>
-              </View>
-              <View style={{ marginTop: '24rpx' }}>
-                <Button
-                  style={S.nextBtn}
-                  onClick={() => { stopAll(); nextQuestion() }}
-                >Next Question →</Button>
-              </View>
-            </View>
-          )}
-        </View>
-      </ScrollView>
-    )
-  }
-
-  // ── Review ───────────────────────────────────────────────────────────────────
-
-  const renderReview = () => {
-    const mistakes = getMistakes()
-    return (
-      <ScrollView scrollY style={{ flex: 1 }}>
-        <View style={S.main}>
-          <Text style={S.sectionTitle}>📋 Mistakes Review</Text>
-          {mistakes.length === 0 ? (
-            <Text style={S.emptyText}>No mistakes yet. Keep playing!</Text>
-          ) : (
-            mistakes.slice(-20).reverse().map((a, i) => (
-              <View key={i} style={S.reviewItem}>
-                <Text style={S.reviewItemName}>{a.question.targetName}</Text>
-                <Text style={S.reviewItemMeta}>
-                  You answered: {a.userAnswer} · {a.question.type} · {a.question.difficulty}
-                </Text>
-                <Button
-                  style={S.reviewItemReplay}
-                  onClick={() => handleReplay(a)}
-                >▶ Replay</Button>
-              </View>
-            ))
-          )}
-          <Button style={S.backBtn} onClick={goToMenu}>← Back to Menu</Button>
-        </View>
-      </ScrollView>
-    )
-  }
-
-  // ── Progress ─────────────────────────────────────────────────────────────────
-
-  const renderProgress = () => {
-    const accuracy = progress.totalQuestionsAnswered > 0
-      ? Math.round((progress.totalCorrect / progress.totalQuestionsAnswered) * 100)
-      : 0
-    const weaknesses = getWeaknesses()
-    const accuracyOverTime = getAccuracyOverTime()
-
-    return (
-      <ScrollView scrollY style={{ flex: 1 }}>
-        <View style={S.main}>
-          <Text style={S.sectionTitle}>📊 Your Progress</Text>
-
-          <View style={S.statRow}>
-            <View style={S.statCard}>
-              <Text style={S.statValue}>{progress.totalScore}</Text>
-              <Text style={S.statLabel}>Total Score</Text>
-            </View>
-            <View style={S.statCard}>
-              <Text style={S.statValue}>{accuracy}%</Text>
-              <Text style={S.statLabel}>Accuracy</Text>
-            </View>
-          </View>
-
-          <View style={S.statRow}>
-            <View style={S.statCard}>
-              <Text style={S.statValue}>{progress.totalQuestionsAnswered}</Text>
-              <Text style={S.statLabel}>Questions</Text>
-            </View>
-            <View style={S.statCard}>
-              <Text style={S.statValue}>{progress.totalCorrect}</Text>
-              <Text style={S.statLabel}>Correct</Text>
-            </View>
-          </View>
-
-          {accuracyOverTime.length > 0 && (
-            <View>
-              <Text style={{ ...S.sectionTitle, fontSize: '30rpx' }}>Accuracy Trend</Text>
-              <View style={{ display: 'flex' as const, gap: '8rpx', alignItems: 'flex-end' as const, height: '120rpx' }}>
-                {accuracyOverTime.map((b, i) => (
-                  <View key={i} style={{ flex: 1, backgroundColor: b.accuracy >= 70 ? '#059669' : b.accuracy >= 50 ? '#d97706' : '#dc2626', height: `${b.accuracy}%`, borderRadius: '4rpx', minHeight: '8rpx' }} />
-                ))}
-              </View>
-            </View>
-          )}
-
-          {weaknesses.length > 0 && (
-            <View>
-              <Text style={{ ...S.sectionTitle, fontSize: '30rpx' }}>Weak Spots</Text>
-              {weaknesses.map((w, i) => (
-                <View key={i} style={S.weaknessItem}>
-                  <Text style={S.weaknessName}>{w.name}</Text>
-                  <Text style={S.weaknessCount}>{w.count} mistakes</Text>
-                </View>
-              ))}
-            </View>
-          )}
-
-          <Button style={S.backBtn} onClick={goToMenu}>← Back to Menu</Button>
-        </View>
-      </ScrollView>
-    )
-  }
-
-  // ── Render ────────────────────────────────────────────────────────────────────
+  const navItems: { id: 'menu' | 'review' | 'progress'; label: string }[] = [
+    { id: 'menu',     label: '🏠 Play' },
+    { id: 'review',   label: '📋 Review' },
+    { id: 'progress', label: '📊 Stats' },
+  ]
+  const activeNav = isPlaying ? 'menu' : status as 'menu' | 'review' | 'progress'
 
   return (
-    <View style={S.screen}>
-      {renderHeader()}
-      {(status === 'menu') && renderMenu()}
-      {(status === 'playing' || status === 'answering' || status === 'feedback') && renderGame()}
-      {status === 'review' && renderReview()}
-      {status === 'progress' && renderProgress()}
+    <View style={{ minHeight: '100vh', backgroundColor: '#0f172a', display: 'flex' as const, flexDirection: 'column' as const }}>
+
+      {/* ── HEADER ── */}
+      <View style={{ backgroundColor: '#0f172a', borderBottom: '1rpx solid #1e293b', paddingLeft: '24rpx', paddingRight: '24rpx', paddingTop: '16rpx', paddingBottom: '16rpx', display: 'flex' as const, alignItems: 'center' as const, justifyContent: 'space-between' as const }}>
+        <View style={{ display: 'flex' as const, alignItems: 'center' as const, gap: '12rpx' }}>
+          <Text style={{ fontSize: '32rpx' }}>🎵</Text>
+          <Text style={{ color: '#f8fafc', fontSize: '32rpx', fontWeight: '700' as const }}>Ear Trainer</Text>
+        </View>
+        <View style={{ display: 'flex' as const, gap: '4rpx' }}>
+          {navItems.map(item => (
+            <Text key={item.id}
+              style={{ fontSize: '22rpx', fontWeight: '500' as const, paddingLeft: '16rpx', paddingRight: '16rpx', paddingTop: '10rpx', paddingBottom: '10rpx', borderRadius: '12rpx', color: activeNav === item.id ? '#f8fafc' : '#94a3b8', backgroundColor: activeNav === item.id ? '#7c3aed' : 'transparent' }}
+              onClick={() => {
+                if (item.id === 'menu') { stopAll(); goToMenu() }
+                else if (item.id === 'review') { goToReview() }
+                else { goToProgress() }
+              }}>
+              {item.label}
+            </Text>
+          ))}
+        </View>
+        <View style={{ display: 'flex' as const, gap: '6rpx', alignItems: 'center' as const }}>
+          <Text style={{ color: '#94a3b8', fontSize: '22rpx' }}>Score:</Text>
+          <Text style={{ color: '#a78bfa', fontSize: '26rpx', fontWeight: '700' as const }}>{progress.totalScore.toLocaleString()}</Text>
+        </View>
+      </View>
+
+      {/* ── MENU ── */}
+      {status === 'menu' && (
+        <ScrollView scrollY style={{ flex: 1 }}>
+          <View style={{ padding: '40rpx 28rpx', display: 'flex' as const, flexDirection: 'column' as const, alignItems: 'center' as const, gap: '24rpx' }}>
+            <View style={{ textAlign: 'center' as const, marginBottom: '12rpx' }}>
+              <Text style={{ color: '#f8fafc', fontSize: '44rpx', fontWeight: '700' as const, display: 'block' as const }}>Choose Difficulty</Text>
+              <Text style={{ color: '#94a3b8', fontSize: '26rpx', marginTop: '8rpx', display: 'block' as const }}>Train your ear with intervals and chords</Text>
+            </View>
+            {([
+              { id: 'easy'   as Difficulty, emoji: '🛡', label: 'Easy',   color: '#4ade80', border: '#166534', bg: '#052e16', desc: 'Basic intervals & triads. Visual hints on keyboard.', levels: '1–10' },
+              { id: 'normal' as Difficulty, emoji: '⚔', label: 'Normal', color: '#fbbf24', border: '#92400e', bg: '#451a03', desc: 'All diatonic intervals & seventh chords. No hints.',   levels: '11–25' },
+              { id: 'hard'   as Difficulty, emoji: '💀', label: 'Hard',   color: '#f87171', border: '#991b1b', bg: '#450a0a', desc: 'Extended chords, altered dominants, compound intervals.', levels: '26–50' },
+            ] as const).map(d => (
+              <Button key={d.id}
+                style={{ width: '100%', backgroundColor: d.bg, borderWidth: 2, borderStyle: 'solid' as const, borderColor: d.border, borderRadius: '24rpx', padding: '36rpx', display: 'flex' as const, flexDirection: 'column' as const, alignItems: 'center' as const, gap: '12rpx' }}
+                onClick={() => startGame(d.id, progress.highestLevel[d.id])}>
+                <Text style={{ fontSize: '56rpx' }}>{d.emoji}</Text>
+                <Text style={{ color: d.color, fontSize: '36rpx', fontWeight: '700' as const }}>{d.label}</Text>
+                <Text style={{ color: '#94a3b8', fontSize: '24rpx', textAlign: 'center' as const }}>{d.desc}</Text>
+                <View style={{ display: 'flex' as const, alignItems: 'center' as const, gap: '16rpx', marginTop: '8rpx' }}>
+                  <Text style={{ color: '#64748b', fontSize: '24rpx' }}>Levels {d.levels}</Text>
+                  <Text style={{ color: '#a78bfa', fontSize: '24rpx', fontWeight: '500' as const }}>Lv.{progress.highestLevel[d.id]}</Text>
+                </View>
+              </Button>
+            ))}
+          </View>
+        </ScrollView>
+      )}
+
+      {/* ── GAME BOARD ── */}
+      {isPlaying && q && (
+        <ScrollView scrollY style={{ flex: 1 }}>
+          <View style={{ padding: '24rpx', display: 'flex' as const, flexDirection: 'column' as const, gap: '24rpx' }}>
+
+            <ScoreBar state={state} onQuit={() => { stopAll(); goToMenu() }} />
+
+            <View style={{ textAlign: 'center' as const }}>
+              <Text style={{ color: '#64748b', fontSize: '22rpx', textTransform: 'uppercase' as const, letterSpacing: '2rpx' }}>
+                Identify the {q.type}
+              </Text>
+            </View>
+
+            <PianoKeyboard highlightedNotes={highlightedNotes} showHints={showHints || isFeedback} />
+
+            {/* Controls */}
+            <View style={{ display: 'flex' as const, alignItems: 'center' as const, justifyContent: 'center' as const, gap: '16rpx' }}>
+              {status === 'playing' && (
+                <Button
+                  style={{ paddingLeft: '60rpx', paddingRight: '60rpx', paddingTop: '28rpx', paddingBottom: '28rpx', backgroundColor: '#7c3aed', color: '#fff', fontWeight: '700' as const, borderRadius: '24rpx', fontSize: '30rpx' }}
+                  onClick={() => { stopAll(); handlePlaySound(); startAnswering() }}>
+                  ▶  Play Sound
+                </Button>
+              )}
+              {isAnswering && (
+                <>
+                  <Button
+                    style={{ paddingLeft: '28rpx', paddingRight: '28rpx', paddingTop: '18rpx', paddingBottom: '18rpx', backgroundColor: '#334155', color: '#f8fafc', borderRadius: '16rpx', fontSize: '26rpx' }}
+                    onClick={() => { stopAll(); handlePlaySound() }}>
+                    🔊  Replay
+                  </Button>
+                  {isFeedback && q.type === 'chord' && (
+                    <Button
+                      style={{ paddingLeft: '28rpx', paddingRight: '28rpx', paddingTop: '18rpx', paddingBottom: '18rpx', backgroundColor: '#334155', color: '#f8fafc', borderRadius: '16rpx', fontSize: '26rpx' }}
+                      onClick={() => { stopAll(); handlePlayArpeggio() }}>
+                      🎵  Play Notes
+                    </Button>
+                  )}
+                </>
+              )}
+            </View>
+
+            {/* Answer options */}
+            {isAnswering && (
+              <AnswerGrid
+                options={q.options}
+                onSelect={opt => { stopAll(); handleSubmitAnswer(opt) }}
+                disabled={isFeedback}
+                correctAnswer={isFeedback ? q.targetName : undefined}
+                userAnswer={isFeedback ? lastAnswer?.userAnswer : undefined}
+                showResult={isFeedback}
+              />
+            )}
+
+            {/* Feedback */}
+            {isFeedback && lastAnswer && (
+              <View style={{ display: 'flex' as const, flexDirection: 'column' as const, alignItems: 'center' as const, gap: '20rpx' }}>
+                <View style={{ paddingLeft: '40rpx', paddingRight: '40rpx', paddingTop: '24rpx', paddingBottom: '24rpx', borderRadius: '16rpx', textAlign: 'center' as const, backgroundColor: lastAnswer.isCorrect ? '#052e16' : '#450a0a', borderWidth: 1, borderStyle: 'solid' as const, borderColor: lastAnswer.isCorrect ? '#059669' : '#dc2626' }}>
+                  {lastAnswer.isCorrect ? (
+                    <Text style={{ color: '#6ee7b7', fontSize: '28rpx', fontWeight: '700' as const }}>
+                      Correct! +{state.score - prevScoreRef.current}
+                    </Text>
+                  ) : (
+                    <Text style={{ color: '#fca5a5', fontSize: '28rpx' }}>
+                      The answer was <Text style={{ fontWeight: '700' as const }}>{q.targetName}</Text>
+                    </Text>
+                  )}
+                </View>
+                <Button
+                  style={{ paddingLeft: '40rpx', paddingRight: '40rpx', paddingTop: '24rpx', paddingBottom: '24rpx', backgroundColor: '#7c3aed', color: '#fff', fontWeight: '600' as const, borderRadius: '16rpx', fontSize: '28rpx' }}
+                  onClick={() => { stopAll(); nextQuestion() }}>
+                  →  Next Question
+                </Button>
+              </View>
+            )}
+          </View>
+        </ScrollView>
+      )}
+
+      {/* ── REVIEW ── */}
+      {status === 'review' && (() => {
+        const mistakes    = getMistakes()
+        const weaknesses  = getWeaknesses()
+        const recent      = [...mistakes].reverse().slice(0, 50)
+        return (
+          <ScrollView scrollY style={{ flex: 1 }}>
+            <View style={{ padding: '32rpx 28rpx', display: 'flex' as const, flexDirection: 'column' as const, gap: '40rpx' }}>
+
+              <View>
+                <Text style={{ color: '#f8fafc', fontSize: '34rpx', fontWeight: '700' as const, marginBottom: '20rpx', display: 'block' as const }}>
+                  ⚠️  Areas to Improve
+                </Text>
+                {weaknesses.length === 0 ? (
+                  <Text style={{ color: '#64748b', fontSize: '26rpx' }}>No mistakes recorded yet. Start playing!</Text>
+                ) : (
+                  <View style={{ display: 'flex' as const, flexWrap: 'wrap' as const, gap: '14rpx' }}>
+                    {weaknesses.map(w => (
+                      <View key={w.name} style={{ width: 'calc(50% - 7rpx)', backgroundColor: '#1e293b', borderWidth: 1, borderStyle: 'solid' as const, borderColor: '#334155', borderRadius: '16rpx', paddingLeft: '20rpx', paddingRight: '20rpx', paddingTop: '16rpx', paddingBottom: '16rpx', display: 'flex' as const, justifyContent: 'space-between' as const, alignItems: 'center' as const }}>
+                        <Text style={{ color: '#f8fafc', fontSize: '24rpx', fontWeight: '500' as const }}>{w.name}</Text>
+                        <Text style={{ color: '#f87171', fontSize: '22rpx', fontWeight: '700' as const }}>{w.count}x</Text>
+                      </View>
+                    ))}
+                  </View>
+                )}
+              </View>
+
+              <View>
+                <Text style={{ color: '#f8fafc', fontSize: '34rpx', fontWeight: '700' as const, marginBottom: '20rpx', display: 'block' as const }}>
+                  Recent Mistakes
+                </Text>
+                {recent.length === 0 ? (
+                  <Text style={{ color: '#64748b', fontSize: '26rpx' }}>No mistakes yet!</Text>
+                ) : (
+                  recent.map((m, i) => (
+                    <View key={`${m.questionId}-${i}`} style={{ backgroundColor: '#1e293b', borderWidth: 1, borderStyle: 'solid' as const, borderColor: '#334155', borderRadius: '16rpx', paddingLeft: '24rpx', paddingRight: '24rpx', paddingTop: '18rpx', paddingBottom: '18rpx', marginBottom: '12rpx', display: 'flex' as const, justifyContent: 'space-between' as const, alignItems: 'center' as const, gap: '16rpx' }}>
+                      <View style={{ flex: 1 }}>
+                        <View style={{ display: 'flex' as const, gap: '12rpx', marginBottom: '8rpx' }}>
+                          <Text style={{ color: '#64748b', fontSize: '20rpx', textTransform: 'uppercase' as const }}>{m.question.type}</Text>
+                          <Text style={{ color: '#475569', fontSize: '20rpx' }}>{m.question.difficulty} · Lv.{m.question.level}</Text>
+                        </View>
+                        <View style={{ display: 'flex' as const, alignItems: 'center' as const, gap: '12rpx' }}>
+                          <Text style={{ color: '#f87171', fontSize: '26rpx', textDecorationLine: 'line-through' as const }}>{m.userAnswer}</Text>
+                          <Text style={{ color: '#475569' }}>→</Text>
+                          <Text style={{ color: '#4ade80', fontSize: '26rpx', fontWeight: '600' as const }}>{m.correctAnswer}</Text>
+                        </View>
+                      </View>
+                      <Button
+                        style={{ paddingLeft: '20rpx', paddingRight: '20rpx', paddingTop: '14rpx', paddingBottom: '14rpx', backgroundColor: '#334155', borderRadius: '12rpx', color: '#94a3b8', fontSize: '24rpx' }}
+                        onClick={() => handleReplay(m)}>🔊</Button>
+                    </View>
+                  ))
+                )}
+              </View>
+            </View>
+          </ScrollView>
+        )
+      })()}
+
+      {/* ── PROGRESS ── */}
+      {status === 'progress' && (() => {
+        const accuracy       = progress.totalQuestionsAnswered > 0 ? Math.round((progress.totalCorrect / progress.totalQuestionsAnswered) * 100) : 0
+        const weaknesses     = getWeaknesses()
+        const accuracyTrend  = getAccuracyOverTime()
+        const maxWeak        = weaknesses.length > 0 ? weaknesses[0].count : 1
+
+        return (
+          <ScrollView scrollY style={{ flex: 1 }}>
+            <View style={{ padding: '32rpx 28rpx', display: 'flex' as const, flexDirection: 'column' as const, gap: '28rpx' }}>
+
+              {/* Stats grid */}
+              <View style={{ display: 'flex' as const, flexWrap: 'wrap' as const, gap: '16rpx' }}>
+                {([
+                  { emoji: '🏆', label: 'Total Score', value: progress.totalScore.toLocaleString(), color: '#a78bfa' },
+                  { emoji: '📈', label: 'Accuracy',    value: `${accuracy}%`,                       color: '#4ade80' },
+                  { emoji: '⏱',  label: 'Questions',   value: String(progress.totalQuestionsAnswered), color: '#fbbf24' },
+                  { emoji: '✅', label: 'Correct',     value: String(progress.totalCorrect),         color: '#60a5fa' },
+                ] as const).map(s => (
+                  <View key={s.label} style={{ width: 'calc(50% - 8rpx)', backgroundColor: '#1e293b', borderWidth: 1, borderStyle: 'solid' as const, borderColor: '#334155', borderRadius: '16rpx', padding: '24rpx', display: 'flex' as const, flexDirection: 'column' as const, gap: '10rpx' }}>
+                    <View style={{ display: 'flex' as const, alignItems: 'center' as const, gap: '10rpx' }}>
+                      <Text style={{ fontSize: '26rpx' }}>{s.emoji}</Text>
+                      <Text style={{ color: '#94a3b8', fontSize: '20rpx', textTransform: 'uppercase' as const }}>{s.label}</Text>
+                    </View>
+                    <Text style={{ color: s.color, fontSize: '44rpx', fontWeight: '700' as const }}>{s.value}</Text>
+                  </View>
+                ))}
+              </View>
+
+              {/* Highest levels */}
+              <View style={{ backgroundColor: '#1e293b', borderWidth: 1, borderStyle: 'solid' as const, borderColor: '#334155', borderRadius: '16rpx', padding: '28rpx' }}>
+                <Text style={{ color: '#f8fafc', fontSize: '30rpx', fontWeight: '700' as const, marginBottom: '20rpx', display: 'block' as const }}>Highest Levels</Text>
+                <View style={{ display: 'flex' as const, gap: '32rpx' }}>
+                  {([
+                    { key: 'easy'   as Difficulty, label: 'Easy',   color: '#4ade80' },
+                    { key: 'normal' as Difficulty, label: 'Normal', color: '#fbbf24' },
+                    { key: 'hard'   as Difficulty, label: 'Hard',   color: '#f87171' },
+                  ] as const).map(d => (
+                    <View key={d.key} style={{ display: 'flex' as const, gap: '8rpx', alignItems: 'center' as const }}>
+                      <Text style={{ color: d.color, fontSize: '24rpx', fontWeight: '500' as const }}>{d.label}:</Text>
+                      <Text style={{ color: '#f8fafc', fontSize: '24rpx', fontWeight: '700' as const }}>Lv.{progress.highestLevel[d.key]}</Text>
+                    </View>
+                  ))}
+                </View>
+              </View>
+
+              {/* Accuracy trend bar chart */}
+              {accuracyTrend.length > 1 && (
+                <View style={{ backgroundColor: '#1e293b', borderWidth: 1, borderStyle: 'solid' as const, borderColor: '#334155', borderRadius: '16rpx', padding: '28rpx' }}>
+                  <Text style={{ color: '#f8fafc', fontSize: '30rpx', fontWeight: '700' as const, marginBottom: '20rpx', display: 'block' as const }}>Accuracy Over Time</Text>
+                  <View style={{ display: 'flex' as const, alignItems: 'flex-end' as const, gap: '4rpx', height: '160rpx' }}>
+                    {accuracyTrend.map((b, i) => (
+                      <View key={i} style={{ flex: 1, display: 'flex' as const, flexDirection: 'column' as const, alignItems: 'center' as const, justifyContent: 'flex-end' as const, height: '100%' }}>
+                        <Text style={{ color: '#64748b', fontSize: '16rpx', marginBottom: '4rpx' }}>{b.accuracy}</Text>
+                        <View style={{ width: '100%', height: `${Math.max(b.accuracy, 4)}%`, backgroundColor: b.accuracy >= 70 ? '#059669' : b.accuracy >= 50 ? '#d97706' : '#dc2626', borderRadius: '4rpx 4rpx 0 0' }} />
+                      </View>
+                    ))}
+                  </View>
+                  <View style={{ display: 'flex' as const, justifyContent: 'space-between' as const, marginTop: '8rpx' }}>
+                    <Text style={{ color: '#64748b', fontSize: '20rpx' }}>Older</Text>
+                    <Text style={{ color: '#64748b', fontSize: '20rpx' }}>Recent</Text>
+                  </View>
+                </View>
+              )}
+
+              {/* Most missed horizontal bars */}
+              {weaknesses.length > 0 && (
+                <View style={{ backgroundColor: '#1e293b', borderWidth: 1, borderStyle: 'solid' as const, borderColor: '#334155', borderRadius: '16rpx', padding: '28rpx' }}>
+                  <Text style={{ color: '#f8fafc', fontSize: '30rpx', fontWeight: '700' as const, marginBottom: '20rpx', display: 'block' as const }}>Most Missed</Text>
+                  {weaknesses.map(w => (
+                    <View key={w.name} style={{ marginBottom: '16rpx' }}>
+                      <View style={{ display: 'flex' as const, justifyContent: 'space-between' as const, marginBottom: '6rpx' }}>
+                        <Text style={{ color: '#94a3b8', fontSize: '24rpx' }}>{w.name}</Text>
+                        <Text style={{ color: '#f87171', fontSize: '24rpx', fontWeight: '700' as const }}>{w.count}</Text>
+                      </View>
+                      <View style={{ backgroundColor: '#334155', borderRadius: '4rpx', height: '12rpx' }}>
+                        <View style={{ width: `${Math.round((w.count / maxWeak) * 100)}%`, height: '100%', backgroundColor: '#ef4444', borderRadius: '4rpx' }} />
+                      </View>
+                    </View>
+                  ))}
+                </View>
+              )}
+
+              {progress.totalQuestionsAnswered === 0 && (
+                <View style={{ textAlign: 'center' as const, paddingTop: '60rpx', paddingBottom: '60rpx' }}>
+                  <Text style={{ color: '#64748b', fontSize: '32rpx', display: 'block' as const }}>No data yet</Text>
+                  <Text style={{ color: '#475569', fontSize: '26rpx', marginTop: '8rpx', display: 'block' as const }}>Start playing to see your progress!</Text>
+                </View>
+              )}
+            </View>
+          </ScrollView>
+        )
+      })()}
     </View>
   )
 }
