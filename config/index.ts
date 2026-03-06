@@ -18,9 +18,7 @@ export default defineConfig(async (merge, { command, mode }) => {
     plugins: ['@tarojs/plugin-platform-weapp'],
     defineConstants: {},
     copy: {
-      patterns: [
-        { from: 'public/audio', to: 'dist/audio' }
-      ],
+      patterns: [],
       options: {},
     },
     framework: 'react',

@@ -3,33 +3,7 @@ import Taro from '@tarojs/taro'
 import type { Difficulty } from '../types/index'
 import { DIFFICULTY_CONFIGS } from '../lib/musicTheory'
 import { noteFromSemitone } from '../lib/musicTheory'
-
-// Map notes to available piano samples
-const PIANO_SAMPLES: Record<string, string> = {
-  // A notes
-  'A0': '/audio/A0.mp3', 'A1': '/audio/A1.mp3', 'A2': '/audio/A2.mp3', 'A3': '/audio/A3.mp3',
-  'A4': '/audio/A4.mp3', 'A5': '/audio/A5.mp3', 'A6': '/audio/A6.mp3', 'A7': '/audio/A7.mp3',
-  // C notes
-  'C1': '/audio/C1.mp3', 'C2': '/audio/C2.mp3', 'C3': '/audio/C3.mp3', 'C4': '/audio/C4.mp3',
-  'C5': '/audio/C5.mp3', 'C6': '/audio/C6.mp3', 'C7': '/audio/C7.mp3', 'C8': '/audio/C8.mp3',
-  // C#/D♭ notes (using Ds files)
-  'C#1': '/audio/Ds1.mp3', 'C#2': '/audio/Ds2.mp3', 'C#3': '/audio/Ds3.mp3', 'C#4': '/audio/Ds4.mp3',
-  'C#5': '/audio/Ds5.mp3', 'C#6': '/audio/Ds6.mp3', 'C#7': '/audio/Ds7.mp3',
-  'Db1': '/audio/Ds1.mp3', 'Db2': '/audio/Ds2.mp3', 'Db3': '/audio/Ds3.mp3', 'Db4': '/audio/Ds4.mp3',
-  'Db5': '/audio/Ds5.mp3', 'Db6': '/audio/Ds6.mp3', 'Db7': '/audio/Ds7.mp3',
-  // D♯ notes
-  'D#1': '/audio/Ds1.mp3', 'D#2': '/audio/Ds2.mp3', 'D#3': '/audio/Ds3.mp3', 'D#4': '/audio/Ds4.mp3',
-  'D#5': '/audio/Ds5.mp3', 'D#6': '/audio/Ds6.mp3', 'D#7': '/audio/Ds7.mp3',
-  // E♭ notes (same as D#)
-  'Eb1': '/audio/Ds1.mp3', 'Eb2': '/audio/Ds2.mp3', 'Eb3': '/audio/Ds3.mp3', 'Eb4': '/audio/Ds4.mp3',
-  'Eb5': '/audio/Ds5.mp3', 'Eb6': '/audio/Ds6.mp3', 'Eb7': '/audio/Ds7.mp3',
-  // F♯ notes
-  'F#1': '/audio/Fs1.mp3', 'F#2': '/audio/Fs2.mp3', 'F#3': '/audio/Fs3.mp3', 'F#4': '/audio/Fs4.mp3',
-  'F#5': '/audio/Fs5.mp3', 'F#6': '/audio/Fs6.mp3', 'F#7': '/audio/Fs7.mp3',
-  // G♭ notes (same as F#)
-  'Gb1': '/audio/Fs1.mp3', 'Gb2': '/audio/Fs2.mp3', 'Gb3': '/audio/Fs3.mp3', 'Gb4': '/audio/Fs4.mp3',
-  'Gb5': '/audio/Fs5.mp3', 'Gb6': '/audio/Fs6.mp3', 'Gb7': '/audio/Fs7.mp3',
-}
+import { useAudioCache } from './useAudioCache'
 
 // Convert note name to frequency (for oscillator fallback)
 function noteToFrequency(note: string): number {
@@ -64,13 +38,23 @@ export function useAudio() {
   const audioCtxRef = useRef<any>(null)
   const [isLoading, setIsLoading] = useState(false)
   const activeNodesRef = useRef<Array<{ source?: any; oscillator?: any; gain: any; stopTime: number }>>([])
+  const cacheRef = useRef<any>(null)
 
   const getCtx = useCallback((): any => {
     if (!audioCtxRef.current) {
       audioCtxRef.current = (Taro as any).createWebAudioContext()
+      cacheRef.current = useAudioCache(audioCtxRef.current)
     }
     return audioCtxRef.current
   }, [])
+
+  const getCache = useCallback(() => {
+    if (!cacheRef.current) {
+      const ctx = getCtx()
+      cacheRef.current = useAudioCache(ctx)
+    }
+    return cacheRef.current
+  }, [getCtx])
 
   const stopAll = useCallback(() => {
     const ctx = audioCtxRef.current
@@ -92,15 +76,12 @@ export function useAudio() {
   const scheduleSample = useCallback(
     async (note: string, durationSec: number, startTime: number) => {
       const ctx = getCtx()
-      const normalizedNote = normalizeNoteName(note)
-      const samplePath = PIANO_SAMPLES[normalizedNote]
+      const cache = getCache()
 
-      if (samplePath) {
-        // Use piano sample
-        try {
-          const response = await Taro.request({ url: samplePath, responseType: 'arraybuffer' })
-          const audioBuffer = await ctx.decodeAudioData(response.data)
-          
+      // Try to load cached sample
+      try {
+        const audioBuffer = await cache.getSample(note)
+        if (audioBuffer) {
           const source = ctx.createBufferSource()
           source.buffer = audioBuffer
           
@@ -119,9 +100,9 @@ export function useAudio() {
           activeNodesRef.current.push(entry)
 
           return source
-        } catch (error) {
-          console.warn(`Failed to load sample for ${note}, falling back to oscillator`, error)
         }
+      } catch (error) {
+        console.warn(`Failed to load sample for ${note}, falling back to oscillator`, error)
       }
 
       // Fallback to oscillator
@@ -147,7 +128,7 @@ export function useAudio() {
 
       return osc
     },
-    [getCtx]
+    [getCtx, getCache]
   )
 
   const scheduleTone = useCallback(
@@ -234,5 +215,13 @@ export function useAudio() {
     [getCtx, scheduleTone]
   )
 
-  return { playInterval, playChord, playArpeggio, playNote, stopAll, isLoading }
+  return { 
+    playInterval, 
+    playChord, 
+    playArpeggio, 
+    playNote, 
+    stopAll, 
+    isLoading,
+    getCacheStats: () => cacheRef.current?.getStats() || { cached: 0, loading: 0, total: 30 }
+  }
 }

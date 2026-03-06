@@ -1,0 +1,207 @@
+import { useCallback } from 'react'
+
+// Base URL for piano samples (you can host these anywhere)
+// IMPORTANT: Update this URL to point to your audio files
+// See AUDIO_HOSTING.md for instructions
+const AUDIO_BASE_URL = 'https://tonejs.github.io/audio/salamander' // Replace with actual CDN URL
+
+// List of all piano samples
+const PIANO_SAMPLE_PATHS = [
+  'A0.mp3', 'A1.mp3', 'A2.mp3', 'A3.mp3', 'A4.mp3', 'A5.mp3', 'A6.mp3', 'A7.mp3',
+  'C1.mp3', 'C2.mp3', 'C3.mp3', 'C4.mp3', 'C5.mp3', 'C6.mp3', 'C7.mp3', 'C8.mp3',
+  'Ds1.mp3', 'Ds2.mp3', 'Ds3.mp3', 'Ds4.mp3', 'Ds5.mp3', 'Ds6.mp3', 'Ds7.mp3',
+  'Fs1.mp3', 'Fs2.mp3', 'Fs3.mp3', 'Fs4.mp3', 'Fs5.mp3', 'Fs6.mp3', 'Fs7.mp3'
+]
+
+// Map notes to available piano samples
+const PIANO_SAMPLES: Record<string, string> = {
+  // A notes
+  'A0': 'A0.mp3', 'A1': 'A1.mp3', 'A2': 'A2.mp3', 'A3': 'A3.mp3',
+  'A4': 'A4.mp3', 'A5': 'A5.mp3', 'A6': 'A6.mp3', 'A7': 'A7.mp3',
+  // C notes
+  'C1': 'C1.mp3', 'C2': 'C2.mp3', 'C3': 'C3.mp3', 'C4': 'C4.mp3',
+  'C5': 'C5.mp3', 'C6': 'C6.mp3', 'C7': 'C7.mp3', 'C8': 'C8.mp3',
+  // C#/D♭ notes (using Ds files)
+  'C#1': 'Ds1.mp3', 'C#2': 'Ds2.mp3', 'C#3': 'Ds3.mp3', 'C#4': 'Ds4.mp3',
+  'C#5': 'Ds5.mp3', 'C#6': 'Ds6.mp3', 'C#7': 'Ds7.mp3',
+  'Db1': 'Ds1.mp3', 'Db2': 'Ds2.mp3', 'Db3': 'Ds3.mp3', 'Db4': 'Ds4.mp3',
+  'Db5': 'Ds5.mp3', 'Db6': 'Ds6.mp3', 'Db7': 'Ds7.mp3',
+  // D♯ notes
+  'D#1': 'Ds1.mp3', 'D#2': 'Ds2.mp3', 'D#3': 'Ds3.mp3', 'D#4': 'Ds4.mp3',
+  'D#5': 'Ds5.mp3', 'D#6': 'Ds6.mp3', 'D#7': 'Ds7.mp3',
+  // E♭ notes (same as D#)
+  'Eb1': 'Ds1.mp3', 'Eb2': 'Ds2.mp3', 'Eb3': 'Ds3.mp3', 'Eb4': 'Ds4.mp3',
+  'Eb5': 'Ds5.mp3', 'Eb6': 'Ds6.mp3', 'Eb7': 'Ds7.mp3',
+  // F♯ notes
+  'F#1': 'Fs1.mp3', 'F#2': 'Fs2.mp3', 'F#3': 'Fs3.mp3', 'F#4': 'Fs4.mp3',
+  'F#5': 'Fs5.mp3', 'F#6': 'Fs6.mp3', 'F#7': 'Fs7.mp3',
+  // G♭ notes (same as F#)
+  'Gb1': 'Fs1.mp3', 'Gb2': 'Fs2.mp3', 'Gb3': 'Fs3.mp3', 'Gb4': 'Fs4.mp3',
+  'Gb5': 'Fs5.mp3', 'Gb6': 'Fs6.mp3', 'Gb7': 'Fs7.mp3',
+}
+
+class AudioCache {
+  private cache = new Map<string, AudioBuffer>()
+  private loadingPromises = new Map<string, Promise<AudioBuffer>>()
+  private ctx: AudioContext
+
+  constructor(ctx: AudioContext) {
+    this.ctx = ctx
+  }
+
+  async loadSample(filename: string): Promise<AudioBuffer> {
+    // Check if already cached
+    if (this.cache.has(filename)) {
+      return this.cache.get(filename)!
+    }
+
+    // Check if currently loading
+    if (this.loadingPromises.has(filename)) {
+      return this.loadingPromises.get(filename)!
+    }
+
+    // Load and cache
+    const loadPromise = this.downloadAndCache(filename)
+    this.loadingPromises.set(filename, loadPromise)
+    
+    try {
+      const buffer = await loadPromise
+      this.cache.set(filename, buffer)
+      return buffer
+    } finally {
+      this.loadingPromises.delete(filename)
+    }
+  }
+
+  private async downloadAndCache(filename: string): Promise<AudioBuffer> {
+    try {
+      // Try to load from local cache first
+      const cachedBuffer = await this.loadFromLocalStorage(filename)
+      if (cachedBuffer) {
+        return cachedBuffer
+      }
+    } catch (e) {
+      console.warn(`Failed to load ${filename} from local cache:`, e)
+    }
+
+    // Download from internet
+    const url = `${AUDIO_BASE_URL}/${filename}`
+    console.log(`Downloading audio sample: ${url}`)
+    
+    const response = await fetch(url)
+    if (!response.ok) {
+      throw new Error(`Failed to download ${filename}: ${response.status}`)
+    }
+
+    const arrayBuffer = await response.arrayBuffer()
+    const audioBuffer = await this.ctx.decodeAudioData(arrayBuffer)
+
+    // Save to local cache for future use
+    try {
+      await this.saveToLocalStorage(filename, arrayBuffer)
+    } catch (e) {
+      console.warn(`Failed to cache ${filename} locally:`, e)
+    }
+
+    return audioBuffer
+  }
+
+  private async loadFromLocalStorage(filename: string): Promise<AudioBuffer | null> {
+    try {
+      const wx = (global as any).wx
+      if (!wx) return null
+
+      const data = wx.getFileSystemManager().readFileSync(`${wx.env.USER_DATA_PATH}/audio/${filename}`)
+      if (data) {
+        return await this.ctx.decodeAudioData(data)
+      }
+    } catch (e) {
+      // File doesn't exist or can't be read
+    }
+    return null
+  }
+
+  private async saveToLocalStorage(filename: string, arrayBuffer: ArrayBuffer): Promise<void> {
+    try {
+      const wx = (global as any).wx
+      if (!wx) return
+
+      const fs = wx.getFileSystemManager()
+      const dirPath = `${wx.env.USER_DATA_PATH}/audio`
+      
+      // Ensure directory exists
+      try {
+        fs.mkdirSync(dirPath, true)
+      } catch (e) {
+        // Directory might already exist
+      }
+
+      // Save file
+      fs.writeFileSync(`${dirPath}/${filename}`, new Uint8Array(arrayBuffer))
+      console.log(`Cached audio sample: ${filename}`)
+    } catch (e) {
+      console.error(`Failed to save ${filename} to local cache:`, e)
+    }
+  }
+
+  // Preload commonly used samples
+  async preloadCommonSamples(): Promise<void> {
+    const commonSamples = ['C4.mp3', 'A4.mp3', 'Ds4.mp3', 'Fs4.mp3'] // Common notes in middle range
+    
+    await Promise.allSettled(
+      commonSamples.map(sample => this.loadSample(sample))
+    )
+  }
+
+  getStats() {
+    return {
+      cached: this.cache.size,
+      loading: this.loadingPromises.size,
+      total: PIANO_SAMPLE_PATHS.length
+    }
+  }
+}
+
+export function useAudioCache(ctx: AudioContext) {
+  const cache = new AudioCache(ctx)
+
+  const getSample = useCallback(async (note: string): Promise<AudioBuffer | null> => {
+    const normalizedNote = normalizeNoteName(note)
+    const filename = PIANO_SAMPLES[normalizedNote]
+    
+    if (!filename) {
+      return null
+    }
+
+    try {
+      return await cache.loadSample(filename)
+    } catch (error) {
+      console.warn(`Failed to load sample for ${note}:`, error)
+      return null
+    }
+  }, [cache])
+
+  const preloadCommon = useCallback(() => {
+    return cache.preloadCommonSamples()
+  }, [cache])
+
+  const getStats = useCallback(() => {
+    return cache.getStats()
+  }, [cache])
+
+  return {
+    getSample,
+    preloadCommon,
+    getStats
+  }
+}
+
+function normalizeNoteName(note: string): string {
+  const match = note.match(/^([A-G][#b]?)(\d+)$/)
+  if (!match) return note
+  
+  let [, noteName, octave] = match
+  octave = octave.padStart(1, '0')
+  
+  return `${noteName}${octave}`
+}

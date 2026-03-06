@@ -229,7 +229,7 @@ export default function Index() {
         {t.app.earTrainer}
       </Text>
       <Text style={{ color: '#94a3b8', fontSize: '28rpx', textAlign: 'center' as const, marginBottom: '24rpx' }}>
-        Loading piano samples...
+        Initializing audio system...
       </Text>
       
       {/* Progress bar */}
@@ -260,7 +260,7 @@ export default function Index() {
       )}
 
       <Text style={{ color: '#475569', fontSize: '22rpx', textAlign: 'center' as const }}>
-        This will only take a moment...
+        Piano samples will load as you play
       </Text>
     </View>
   )
