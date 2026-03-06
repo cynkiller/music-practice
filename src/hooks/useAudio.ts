@@ -58,8 +58,8 @@ export function useAudio() {
 
       // Piano-like ADSR envelope
       gain.gain.setValueAtTime(0, startTime);
-      gain.gain.linearRampToValueAtTime(0.5, startTime + 0.01);
-      gain.gain.exponentialRampToValueAtTime(0.1, startTime + durationSec * 0.35);
+      gain.gain.linearRampToValueAtTime(0.8, startTime + 0.01);
+      gain.gain.exponentialRampToValueAtTime(0.15, startTime + durationSec * 0.35);
       gain.gain.exponentialRampToValueAtTime(0.001, startTime + durationSec);
 
       osc.connect(gain);
