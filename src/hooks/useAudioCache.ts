@@ -9,64 +9,56 @@ const AUDIO_BASE_URL = 'https://tonejs.github.io/audio/salamander' // Using Tone
 // Additional fallback: Use GitHub Pages (you can replace this)
 const FALLBACK_AUDIO_URL = 'https://raw.githubusercontent.com/cynkiller/music-practice/mini-program/public/audio'
 
-// List of all piano samples
-const PIANO_SAMPLE_PATHS = [
-  'A0.mp3', 'A1.mp3', 'A2.mp3', 'A3.mp3', 'A4.mp3', 'A5.mp3', 'A6.mp3', 'A7.mp3',
-  'C1.mp3', 'C2.mp3', 'C3.mp3', 'C4.mp3', 'C5.mp3', 'C6.mp3', 'C7.mp3', 'C8.mp3',
-  'Ds1.mp3', 'Ds2.mp3', 'Ds3.mp3', 'Ds4.mp3', 'Ds5.mp3', 'Ds6.mp3', 'Ds7.mp3',
-  'Fs1.mp3', 'Fs2.mp3', 'Fs3.mp3', 'Fs4.mp3', 'Fs5.mp3', 'Fs6.mp3', 'Fs7.mp3'
-]
-
-// Map notes to available piano samples
+// Tone.js Salamander piano has all 12 notes per octave
+// Naming: A, As (A#), B, C, Cs (C#), D, Ds (D#), E, F, Fs (F#), G, Gs (G#)
 const PIANO_SAMPLES: Record<string, string> = {
   // A notes
-  'A0': 'A0.mp3', 'A1': 'A1.mp3', 'A2': 'A2.mp3', 'A3': 'A3.mp3',
-  'A4': 'A4.mp3', 'A5': 'A5.mp3', 'A6': 'A6.mp3', 'A7': 'A7.mp3',
-  // B notes (use closest available - fall back to A or C)
-  'B1': 'A1.mp3', 'B2': 'A2.mp3', 'B3': 'A3.mp3', 'B4': 'A4.mp3',
-  'B5': 'A5.mp3', 'B6': 'A6.mp3', 'B7': 'A7.mp3',
+  'A0': 'A0.mp3',
+  'A1': 'A1.mp3', 'A2': 'A2.mp3', 'A3': 'A3.mp3', 'A4': 'A4.mp3',
+  'A5': 'A5.mp3', 'A6': 'A6.mp3', 'A7': 'A7.mp3',
+  // A#/Bb notes → As files
+  'A#1': 'As1.mp3', 'A#2': 'As2.mp3', 'A#3': 'As3.mp3', 'A#4': 'As4.mp3',
+  'A#5': 'As5.mp3', 'A#6': 'As6.mp3', 'A#7': 'As7.mp3',
+  'Bb1': 'As1.mp3', 'Bb2': 'As2.mp3', 'Bb3': 'As3.mp3', 'Bb4': 'As4.mp3',
+  'Bb5': 'As5.mp3', 'Bb6': 'As6.mp3', 'Bb7': 'As7.mp3',
+  // B notes
+  'B1': 'B1.mp3', 'B2': 'B2.mp3', 'B3': 'B3.mp3', 'B4': 'B4.mp3',
+  'B5': 'B5.mp3', 'B6': 'B6.mp3', 'B7': 'B7.mp3',
   // C notes
   'C1': 'C1.mp3', 'C2': 'C2.mp3', 'C3': 'C3.mp3', 'C4': 'C4.mp3',
   'C5': 'C5.mp3', 'C6': 'C6.mp3', 'C7': 'C7.mp3', 'C8': 'C8.mp3',
-  // D notes (use closest available - fall back to C or F#)
-  'D1': 'C1.mp3', 'D2': 'C2.mp3', 'D3': 'C3.mp3', 'D4': 'C4.mp3',
-  'D5': 'C5.mp3', 'D6': 'C6.mp3', 'D7': 'C7.mp3', 'D8': 'C8.mp3',
-  // E notes (use closest available - fall back to C or A)
-  'E1': 'C1.mp3', 'E2': 'C2.mp3', 'E3': 'C3.mp3', 'E4': 'C4.mp3',
-  'E5': 'C5.mp3', 'E6': 'C6.mp3', 'E7': 'C7.mp3', 'E8': 'C8.mp3',
-  // F notes (use closest available - fall back to C or F#)
-  'F1': 'C1.mp3', 'F2': 'C2.mp3', 'F3': 'C3.mp3', 'F4': 'C4.mp3',
-  'F5': 'C5.mp3', 'F6': 'C6.mp3', 'F7': 'C7.mp3', 'F8': 'C8.mp3',
-  // G notes (use closest available - fall back to A or C)
-  'G1': 'A1.mp3', 'G2': 'A2.mp3', 'G3': 'A3.mp3', 'G4': 'A4.mp3',
-  'G5': 'A5.mp3', 'G6': 'A6.mp3', 'G7': 'A7.mp3', 'G8': 'A8.mp3',
-  // C#/D♭ notes (using Ds files)
-  'C#1': 'Ds1.mp3', 'C#2': 'Ds2.mp3', 'C#3': 'Ds3.mp3', 'C#4': 'Ds4.mp3',
-  'C#5': 'Ds5.mp3', 'C#6': 'Ds6.mp3', 'C#7': 'Ds7.mp3',
-  'Db1': 'Ds1.mp3', 'Db2': 'Ds2.mp3', 'Db3': 'Ds3.mp3', 'Db4': 'Ds4.mp3',
-  'Db5': 'Ds5.mp3', 'Db6': 'Ds6.mp3', 'Db7': 'Ds7.mp3',
-  // D♯ notes
+  // C#/Db notes → Cs files
+  'C#1': 'Cs1.mp3', 'C#2': 'Cs2.mp3', 'C#3': 'Cs3.mp3', 'C#4': 'Cs4.mp3',
+  'C#5': 'Cs5.mp3', 'C#6': 'Cs6.mp3', 'C#7': 'Cs7.mp3',
+  'Db1': 'Cs1.mp3', 'Db2': 'Cs2.mp3', 'Db3': 'Cs3.mp3', 'Db4': 'Cs4.mp3',
+  'Db5': 'Cs5.mp3', 'Db6': 'Cs6.mp3', 'Db7': 'Cs7.mp3',
+  // D notes
+  'D1': 'D1.mp3', 'D2': 'D2.mp3', 'D3': 'D3.mp3', 'D4': 'D4.mp3',
+  'D5': 'D5.mp3', 'D6': 'D6.mp3', 'D7': 'D7.mp3',
+  // D#/Eb notes → Ds files
   'D#1': 'Ds1.mp3', 'D#2': 'Ds2.mp3', 'D#3': 'Ds3.mp3', 'D#4': 'Ds4.mp3',
   'D#5': 'Ds5.mp3', 'D#6': 'Ds6.mp3', 'D#7': 'Ds7.mp3',
-  // E♭ notes (same as D#)
   'Eb1': 'Ds1.mp3', 'Eb2': 'Ds2.mp3', 'Eb3': 'Ds3.mp3', 'Eb4': 'Ds4.mp3',
   'Eb5': 'Ds5.mp3', 'Eb6': 'Ds6.mp3', 'Eb7': 'Ds7.mp3',
-  // F♯ notes
+  // E notes
+  'E1': 'E1.mp3', 'E2': 'E2.mp3', 'E3': 'E3.mp3', 'E4': 'E4.mp3',
+  'E5': 'E5.mp3', 'E6': 'E6.mp3', 'E7': 'E7.mp3',
+  // F notes
+  'F1': 'F1.mp3', 'F2': 'F2.mp3', 'F3': 'F3.mp3', 'F4': 'F4.mp3',
+  'F5': 'F5.mp3', 'F6': 'F6.mp3', 'F7': 'F7.mp3',
+  // F#/Gb notes → Fs files
   'F#1': 'Fs1.mp3', 'F#2': 'Fs2.mp3', 'F#3': 'Fs3.mp3', 'F#4': 'Fs4.mp3',
   'F#5': 'Fs5.mp3', 'F#6': 'Fs6.mp3', 'F#7': 'Fs7.mp3',
-  // G♭ notes (same as F#)
   'Gb1': 'Fs1.mp3', 'Gb2': 'Fs2.mp3', 'Gb3': 'Fs3.mp3', 'Gb4': 'Fs4.mp3',
   'Gb5': 'Fs5.mp3', 'Gb6': 'Fs6.mp3', 'Gb7': 'Fs7.mp3',
-  // G#/A♭ notes (use closest available)
-  'G#1': 'A1.mp3', 'G#2': 'A2.mp3', 'G#3': 'A3.mp3', 'G#4': 'A4.mp3',
-  'G#5': 'A5.mp3', 'G#6': 'A6.mp3', 'G#7': 'A7.mp3',
-  'Ab1': 'A1.mp3', 'Ab2': 'A2.mp3', 'Ab3': 'A3.mp3', 'Ab4': 'A4.mp3',
-  'Ab5': 'A5.mp3', 'Ab6': 'A6.mp3', 'Ab7': 'A7.mp3',
-  // A♯/B♭ notes (use closest available)
-  'A#1': 'A1.mp3', 'A#2': 'A2.mp3', 'A#3': 'A3.mp3', 'A#4': 'A4.mp3',
-  'A#5': 'A5.mp3', 'A#6': 'A6.mp3', 'A#7': 'A7.mp3',
-  'Bb1': 'A1.mp3', 'Bb2': 'A2.mp3', 'Bb3': 'A3.mp3', 'Bb4': 'A4.mp3',
-  'Bb5': 'A5.mp3', 'Bb6': 'A6.mp3', 'Bb7': 'A7.mp3',
+  // G notes
+  'G1': 'G1.mp3', 'G2': 'G2.mp3', 'G3': 'G3.mp3', 'G4': 'G4.mp3',
+  'G5': 'G5.mp3', 'G6': 'G6.mp3', 'G7': 'G7.mp3',
+  // G#/Ab notes → Gs files
+  'G#1': 'Gs1.mp3', 'G#2': 'Gs2.mp3', 'G#3': 'Gs3.mp3', 'G#4': 'Gs4.mp3',
+  'G#5': 'Gs5.mp3', 'G#6': 'Gs6.mp3', 'G#7': 'Gs7.mp3',
+  'Ab1': 'Gs1.mp3', 'Ab2': 'Gs2.mp3', 'Ab3': 'Gs3.mp3', 'Ab4': 'Gs4.mp3',
+  'Ab5': 'Gs5.mp3', 'Ab6': 'Gs6.mp3', 'Ab7': 'Gs7.mp3',
 }
 
 export class AudioCache {
@@ -317,7 +309,7 @@ export class AudioCache {
     return {
       cached: this.cache.size,
       loading: this.loadingPromises.size,
-      total: PIANO_SAMPLE_PATHS.length
+      total: Object.keys(PIANO_SAMPLES).length
     }
   }
 
