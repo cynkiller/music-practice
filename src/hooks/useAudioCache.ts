@@ -292,8 +292,11 @@ export class AudioCache {
     const normalizedNote = normalizeNoteName(note)
     const filename = PIANO_SAMPLES[normalizedNote]
     
+    console.log(`Note request: "${note}" -> normalized: "${normalizedNote}" -> filename: "${filename}"`)
+    
     if (!filename) {
-      console.warn(`No sample available for note: ${note}`)
+      console.warn(`No sample available for note: ${note} (normalized: ${normalizedNote})`)
+      console.log(`Available keys in PIANO_SAMPLES:`, Object.keys(PIANO_SAMPLES).slice(0, 10), '...')
       return null
     }
 
