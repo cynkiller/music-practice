@@ -65,6 +65,10 @@ export interface Translations {
     combo: string
     accuracy: string
   }
+  musicTheory: {
+    intervals: Record<string, string>
+    chords: Record<string, string>
+  }
 }
 
 export const translations: Record<Language, Translations> = {
@@ -132,7 +136,44 @@ export const translations: Record<Language, Translations> = {
       level: 'Lv.',
       combo: 'x',
       accuracy: '🎯'
-    }
+    },
+    musicTheory: {
+      intervals: {
+        'Minor 2nd': 'Minor 2nd',
+        'Major 2nd': 'Major 2nd',
+        'Minor 3rd': 'Minor 3rd',
+        'Major 3rd': 'Major 3rd',
+        'Perfect 4th': 'Perfect 4th',
+        'Tritone': 'Tritone',
+        'Perfect 5th': 'Perfect 5th',
+        'Minor 6th': 'Minor 6th',
+        'Major 6th': 'Major 6th',
+        'Minor 7th': 'Minor 7th',
+        'Major 7th': 'Major 7th',
+        'Octave': 'Octave',
+        'Minor 9th': 'Minor 9th',
+        'Major 9th': 'Major 9th',
+        'Minor 10th': 'Minor 10th',
+        'Major 10th': 'Major 10th',
+      },
+      chords: {
+        'Major': 'Major',
+        'Minor': 'Minor',
+        'Diminished': 'Diminished',
+        'Augmented': 'Augmented',
+        'Major 7th': 'Major 7th',
+        'Dominant 7th': 'Dominant 7th',
+        'Minor 7th': 'Minor 7th',
+        'Half-Dim 7th': 'Half-Dim 7th',
+        'Diminished 7th': 'Diminished 7th',
+        'Major 9th': 'Major 9th',
+        'Dominant 9th': 'Dominant 9th',
+        'Minor 9th': 'Minor 9th',
+        'Dominant 11th': 'Dominant 11th',
+        'Dominant 13th': 'Dominant 13th',
+        'Alt Dominant': 'Alt Dominant',
+      },
+    },
   },
   zh: {
     app: {
@@ -198,8 +239,49 @@ export const translations: Record<Language, Translations> = {
       level: '第',
       combo: '连击 x',
       accuracy: '🎯'
-    }
+    },
+    musicTheory: {
+      intervals: {
+        'Minor 2nd': '小二度',
+        'Major 2nd': '大二度',
+        'Minor 3rd': '小三度',
+        'Major 3rd': '大三度',
+        'Perfect 4th': '纯四度',
+        'Tritone': '三全音',
+        'Perfect 5th': '纯五度',
+        'Minor 6th': '小六度',
+        'Major 6th': '大六度',
+        'Minor 7th': '小七度',
+        'Major 7th': '大七度',
+        'Octave': '八度',
+        'Minor 9th': '小九度',
+        'Major 9th': '大九度',
+        'Minor 10th': '小十度',
+        'Major 10th': '大十度',
+      },
+      chords: {
+        'Major': '大三和弦',
+        'Minor': '小三和弦',
+        'Diminished': '减三和弦',
+        'Augmented': '增三和弦',
+        'Major 7th': '大七和弦',
+        'Dominant 7th': '属七和弦',
+        'Minor 7th': '小七和弦',
+        'Half-Dim 7th': '半减七和弦',
+        'Diminished 7th': '减七和弦',
+        'Major 9th': '大九和弦',
+        'Dominant 9th': '属九和弦',
+        'Minor 9th': '小九和弦',
+        'Dominant 11th': '属十一和弦',
+        'Dominant 13th': '属十三和弦',
+        'Alt Dominant': '变化属和弦',
+      },
+    },
   }
+}
+
+export function translateMusicName(name: string, t: Translations): string {
+  return t.musicTheory.intervals[name] ?? t.musicTheory.chords[name] ?? name
 }
 
 export function useTranslation(language: Language) {

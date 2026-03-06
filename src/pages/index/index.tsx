@@ -7,6 +7,7 @@ import { useI18n } from '../../hooks/useI18n'
 import { useAudioPreloader } from '../../hooks/useAudioPreloader'
 import type { Answer, Difficulty, GameState } from '../../types/index'
 import type { Translations } from '../../lib/i18n'
+import { translateMusicName } from '../../lib/i18n'
 import { DIFFICULTY_CONFIGS, NOTES, noteFromSemitone } from '../../lib/musicTheory'
 import './index.scss'
 
@@ -112,9 +113,10 @@ function ScoreBar({ state, onQuit, t }: { state: GameState; onQuit: () => void; 
 
 // ─── Answer Grid ──────────────────────────────────────────────────────────────
 
-function AnswerGrid({ options, onSelect, disabled, correctAnswer, userAnswer, showResult }: {
+function AnswerGrid({ options, onSelect, disabled, correctAnswer, userAnswer, showResult, translateName }: {
   options: string[]; onSelect: (opt: string) => void; disabled: boolean
   correctAnswer?: string; userAnswer?: string; showResult: boolean
+  translateName: (name: string) => string
 }) {
   function btnStyle(option: string): object {
     const base = { borderRadius: '16rpx', fontSize: '26rpx', fontWeight: '600' as const, paddingTop: '22rpx', paddingBottom: '22rpx', paddingLeft: '8rpx', paddingRight: '8rpx', borderWidth: 2, borderStyle: 'solid' as const, textAlign: 'center' as const, width: '100%' }
@@ -131,7 +133,7 @@ function AnswerGrid({ options, onSelect, disabled, correctAnswer, userAnswer, sh
       {options.map(option => (
         <View key={option} style={{ width: 'calc(50% - 7rpx)' }}>
           <Button style={btnStyle(option)} disabled={disabled} onClick={() => { if (!disabled) onSelect(option) }}>
-            {option}
+            {translateName(option)}
           </Button>
         </View>
       ))}
@@ -394,6 +396,7 @@ export default function Index() {
                 correctAnswer={isFeedback ? q.targetName : undefined}
                 userAnswer={isFeedback ? lastAnswer?.userAnswer : undefined}
                 showResult={isFeedback}
+                translateName={name => translateMusicName(name, t)}
               />
             )}
 
@@ -407,7 +410,7 @@ export default function Index() {
                     </Text>
                   ) : (
                     <Text style={{ color: '#fca5a5', fontSize: '28rpx' }}>
-                      {t.game.theAnswerWas} <Text style={{ fontWeight: '700' as const }}>{q.targetName}</Text>
+                      {t.game.theAnswerWas} <Text style={{ fontWeight: '700' as const }}>{translateMusicName(q.targetName, t)}</Text>
                     </Text>
                   )}
                 </View>
@@ -441,7 +444,7 @@ export default function Index() {
                   <View style={{ display: 'flex' as const, flexWrap: 'wrap' as const, gap: '14rpx' }}>
                     {weaknesses.map(w => (
                       <View key={w.name} style={{ width: 'calc(50% - 7rpx)', backgroundColor: '#1e293b', borderWidth: 1, borderStyle: 'solid' as const, borderColor: '#334155', borderRadius: '16rpx', paddingLeft: '20rpx', paddingRight: '20rpx', paddingTop: '16rpx', paddingBottom: '16rpx', display: 'flex' as const, justifyContent: 'space-between' as const, alignItems: 'center' as const }}>
-                        <Text style={{ color: '#f8fafc', fontSize: '24rpx', fontWeight: '500' as const }}>{w.name}</Text>
+                        <Text style={{ color: '#f8fafc', fontSize: '24rpx', fontWeight: '500' as const }}>{translateMusicName(w.name, t)}</Text>
                         <Text style={{ color: '#f87171', fontSize: '22rpx', fontWeight: '700' as const }}>{w.count}x</Text>
                       </View>
                     ))}
@@ -464,9 +467,9 @@ export default function Index() {
                           <Text style={{ color: '#475569', fontSize: '20rpx' }}>{m.question.difficulty} · Lv.{m.question.level}</Text>
                         </View>
                         <View style={{ display: 'flex' as const, alignItems: 'center' as const, gap: '12rpx' }}>
-                          <Text style={{ color: '#f87171', fontSize: '26rpx', textDecorationLine: 'line-through' as const }}>{m.userAnswer}</Text>
+                          <Text style={{ color: '#f87171', fontSize: '26rpx', textDecorationLine: 'line-through' as const }}>{translateMusicName(m.userAnswer, t)}</Text>
                           <Text style={{ color: '#475569' }}>→</Text>
-                          <Text style={{ color: '#4ade80', fontSize: '26rpx', fontWeight: '600' as const }}>{m.correctAnswer}</Text>
+                          <Text style={{ color: '#4ade80', fontSize: '26rpx', fontWeight: '600' as const }}>{translateMusicName(m.correctAnswer, t)}</Text>
                         </View>
                       </View>
                       <Button
