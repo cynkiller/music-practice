@@ -170,19 +170,47 @@ export class AudioCache {
     }
     
     console.log(`Decoding audio data for ${filename}, arrayBuffer length: ${arrayBuffer.byteLength}`)
+    console.log(`ArrayBuffer details:`, {
+      byteLength: arrayBuffer.byteLength,
+      constructor: arrayBuffer.constructor.name,
+      isView: ArrayBuffer.isView(arrayBuffer)
+    })
+    
+    // Try to peek at the first few bytes to check format
+    const uint8Array = new Uint8Array(arrayBuffer.slice(0, 16))
+    console.log(`First 16 bytes:`, Array.from(uint8Array).map(b => b.toString(16).padStart(2, '0')).join(' '))
+    
     let audioBuffer: AudioBuffer
     
     try {
+      // Method 1: Try direct decode
+      console.log(`Attempting direct decode...`)
       audioBuffer = await this.ctx.decodeAudioData(arrayBuffer)
-      console.log(`Successfully decoded ${filename}, duration: ${audioBuffer.duration}s, channels: ${audioBuffer.numberOfChannels}`)
+      console.log(`Successfully decoded ${filename} (direct), duration: ${audioBuffer?.duration}s, channels: ${audioBuffer?.numberOfChannels}`)
     } catch (decodeError) {
-      console.error(`Failed to decode ${filename}:`, decodeError)
-      throw new Error(`Audio decode failed for ${filename}: ${decodeError}`)
+      console.warn(`Direct decode failed for ${filename}:`, decodeError)
+      
+      try {
+        // Method 2: Try with copy
+        console.log(`Attempting decode with copy...`)
+        const copiedBuffer = arrayBuffer.slice(0)
+        audioBuffer = await this.ctx.decodeAudioData(copiedBuffer)
+        console.log(`Successfully decoded ${filename} (copy), duration: ${audioBuffer?.duration}s, channels: ${audioBuffer?.numberOfChannels}`)
+      } catch (copyError) {
+        console.warn(`Copy decode failed for ${filename}:`, copyError)
+        throw new Error(`All decode methods failed for ${filename}: direct=${decodeError}, copy=${copyError}`)
+      }
     }
     
     // Double-check the audioBuffer is valid
-    if (!audioBuffer || audioBuffer.duration === 0) {
-      throw new Error(`Invalid audio buffer for ${filename}: duration is ${audioBuffer?.duration}`)
+    if (!audioBuffer) {
+      throw new Error(`AudioBuffer is null for ${filename}`)
+    }
+    if (audioBuffer.duration === 0) {
+      throw new Error(`AudioBuffer has zero duration for ${filename}`)
+    }
+    if (audioBuffer.numberOfChannels === 0) {
+      throw new Error(`AudioBuffer has zero channels for ${filename}`)
     }
 
     // Save to local cache for future use
