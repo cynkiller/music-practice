@@ -39,6 +39,7 @@ export function useAudio() {
   const [isLoading, setIsLoading] = useState(false)
   const activeNodesRef = useRef<Array<{ source?: any; oscillator?: any; gain: any; stopTime: number }>>([])
   const cacheRef = useRef<any>(null)
+  const masterGainRef = useRef<any>(null)
   
   // DEBUG: Force oscillator fallback for testing
   const FORCE_OSCILLATOR = false // Set to true to test oscillator only
@@ -48,6 +49,13 @@ export function useAudio() {
       try {
         audioCtxRef.current = (Taro as any).createWebAudioContext()
         console.log('Audio context created successfully')
+        
+        // Create master gain node for volume boost
+        masterGainRef.current = audioCtxRef.current.createGain()
+        masterGainRef.current.gain.value = 5.0 // 5x amplification
+        masterGainRef.current.connect(audioCtxRef.current.destination)
+        console.log('Master gain node created with 5x amplification')
+        
         // Initialize cache instance (not hook) here
         if (!cacheRef.current) {
           cacheRef.current = new AudioCache(audioCtxRef.current)
@@ -124,12 +132,12 @@ export function useAudio() {
 
             const gain = ctx.createGain()
             gain.gain.setValueAtTime(0, startTime)
-            gain.gain.linearRampToValueAtTime(1.0, startTime + 0.01)
-            gain.gain.exponentialRampToValueAtTime(0.2, startTime + durationSec * 0.35)
+            gain.gain.linearRampToValueAtTime(2.0, startTime + 0.01)
+            gain.gain.exponentialRampToValueAtTime(0.5, startTime + durationSec * 0.35)
             gain.gain.exponentialRampToValueAtTime(0.001, startTime + durationSec)
 
             source.connect(gain)
-            gain.connect(ctx.destination)
+            gain.connect(masterGainRef.current)
             source.start(startTime)
             source.stop(startTime + durationSec + 0.1)
 
@@ -149,12 +157,12 @@ export function useAudio() {
         osc.type = 'triangle'
         osc.frequency.setValueAtTime(freq, startTime)
         gain.gain.setValueAtTime(0, startTime)
-        gain.gain.linearRampToValueAtTime(1.0, startTime + 0.01)
-        gain.gain.exponentialRampToValueAtTime(0.2, startTime + durationSec * 0.35)
+        gain.gain.linearRampToValueAtTime(2.0, startTime + 0.01)
+        gain.gain.exponentialRampToValueAtTime(0.5, startTime + durationSec * 0.35)
         gain.gain.exponentialRampToValueAtTime(0.001, startTime + durationSec)
 
         osc.connect(gain)
-        gain.connect(ctx.destination)
+        gain.connect(masterGainRef.current)
         osc.start(startTime)
         osc.stop(startTime + durationSec)
 
@@ -169,9 +177,9 @@ export function useAudio() {
           const gain = ctx.createGain()
           osc.type = 'sine'
           osc.frequency.value = freq
-          gain.gain.value = 0.7
+          gain.gain.value = 1.5
           osc.connect(gain)
-          gain.connect(ctx.destination)
+          gain.connect(masterGainRef.current)
           osc.start()
           osc.stop(ctx.currentTime + durationSec)
           console.log(`✓ ${note} emergency fallback triggered`)
