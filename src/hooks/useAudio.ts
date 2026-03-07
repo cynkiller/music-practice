@@ -49,7 +49,7 @@ export function useAudio() {
       try {
         // Route audio through speaker (not earpiece), ignore mute switch on iOS
         try {
-          Taro.setInnerAudioOption({ mixWithOther: false, obeyMuteSwitch: false, speakerOn: true })
+          Taro.setInnerAudioOption({ mixWithOther: false, obeyMuteSwitch: false, speakerOn: true } as any)
           console.log('Audio routed to speaker')
         } catch (e) {
           console.warn('setInnerAudioOption failed:', e)
@@ -142,50 +142,47 @@ export function useAudio() {
       try {
         if (sample) {
           // Try sample playback
+          // Play 3 copies simultaneously — amplitudes sum at destination (3x volume)
+          // This bypasses WeChat's GainNode cap of 1.0
           try {
             const { buffer, playbackRate } = sample
-            const source = ctx.createBufferSource()
-            source.buffer = buffer
-            source.playbackRate.value = playbackRate
-
-            const gain = ctx.createGain()
-            gain.gain.setValueAtTime(0, startTime)
-            gain.gain.linearRampToValueAtTime(2.0, startTime + 0.01)
-            gain.gain.exponentialRampToValueAtTime(0.5, startTime + durationSec * 0.35)
-            gain.gain.exponentialRampToValueAtTime(0.001, startTime + durationSec)
-
-            source.connect(gain)
-            gain.connect(masterGainRef.current)
-            source.start(startTime)
-            source.stop(startTime + durationSec + 0.1)
-
-            activeNodesRef.current.push({ source, gain, stopTime: startTime + durationSec })
-            console.log(`✓ ${note} scheduled via sample at t=${startTime.toFixed(3)}`)
+            const COPIES = 3
+            for (let i = 0; i < COPIES; i++) {
+              const source = ctx.createBufferSource()
+              source.buffer = buffer
+              source.playbackRate.value = playbackRate
+              source.connect(ctx.destination)
+              source.start(startTime)
+              source.stop(startTime + durationSec + 0.1)
+              const fakeGain = ctx.createGain()
+              activeNodesRef.current.push({ source, gain: fakeGain, stopTime: startTime + durationSec })
+            }
+            console.log(`✓ ${note} scheduled via sample x${COPIES} at t=${startTime.toFixed(3)}`)
             return
           } catch (sampleError) {
             console.warn(`Sample playback failed for ${note}, falling back to oscillator:`, sampleError)
           }
         }
 
-        // Oscillator fallback (always works as last resort)
+        // Oscillator fallback — play 3 oscillators in parallel
         const freq = noteToFrequency(note)
-        const osc = ctx.createOscillator()
-        const gain = ctx.createGain()
-
-        osc.type = 'triangle'
-        osc.frequency.setValueAtTime(freq, startTime)
-        gain.gain.setValueAtTime(0, startTime)
-        gain.gain.linearRampToValueAtTime(2.0, startTime + 0.01)
-        gain.gain.exponentialRampToValueAtTime(0.5, startTime + durationSec * 0.35)
-        gain.gain.exponentialRampToValueAtTime(0.001, startTime + durationSec)
-
-        osc.connect(gain)
-        gain.connect(masterGainRef.current)
-        osc.start(startTime)
-        osc.stop(startTime + durationSec)
-
-        activeNodesRef.current.push({ oscillator: osc, gain, stopTime: startTime + durationSec })
-        console.log(`✓ ${note} scheduled via oscillator at t=${startTime.toFixed(3)}`)
+        const COPIES = 3
+        for (let i = 0; i < COPIES; i++) {
+          const osc = ctx.createOscillator()
+          const gain = ctx.createGain()
+          osc.type = 'triangle'
+          osc.frequency.setValueAtTime(freq, startTime)
+          gain.gain.setValueAtTime(0, startTime)
+          gain.gain.linearRampToValueAtTime(1.0, startTime + 0.01)
+          gain.gain.exponentialRampToValueAtTime(0.3, startTime + durationSec * 0.35)
+          gain.gain.exponentialRampToValueAtTime(0.001, startTime + durationSec)
+          osc.connect(gain)
+          gain.connect(ctx.destination)
+          osc.start(startTime)
+          osc.stop(startTime + durationSec)
+          activeNodesRef.current.push({ oscillator: osc, gain, stopTime: startTime + durationSec })
+        }
+        console.log(`✓ ${note} scheduled via oscillator x${COPIES} at t=${startTime.toFixed(3)}`)
       } catch (error) {
         console.error(`CRITICAL: Failed to schedule ${note}:`, error)
         // Last-ditch effort: try immediate oscillator
