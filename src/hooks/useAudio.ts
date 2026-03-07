@@ -124,8 +124,8 @@ export function useAudio() {
 
             const gain = ctx.createGain()
             gain.gain.setValueAtTime(0, startTime)
-            gain.gain.linearRampToValueAtTime(0.8, startTime + 0.01)
-            gain.gain.exponentialRampToValueAtTime(0.15, startTime + durationSec * 0.35)
+            gain.gain.linearRampToValueAtTime(1.0, startTime + 0.01)
+            gain.gain.exponentialRampToValueAtTime(0.2, startTime + durationSec * 0.35)
             gain.gain.exponentialRampToValueAtTime(0.001, startTime + durationSec)
 
             source.connect(gain)
@@ -149,8 +149,8 @@ export function useAudio() {
         osc.type = 'triangle'
         osc.frequency.setValueAtTime(freq, startTime)
         gain.gain.setValueAtTime(0, startTime)
-        gain.gain.linearRampToValueAtTime(0.8, startTime + 0.01)
-        gain.gain.exponentialRampToValueAtTime(0.15, startTime + durationSec * 0.35)
+        gain.gain.linearRampToValueAtTime(1.0, startTime + 0.01)
+        gain.gain.exponentialRampToValueAtTime(0.2, startTime + durationSec * 0.35)
         gain.gain.exponentialRampToValueAtTime(0.001, startTime + durationSec)
 
         osc.connect(gain)
@@ -169,7 +169,7 @@ export function useAudio() {
           const gain = ctx.createGain()
           osc.type = 'sine'
           osc.frequency.value = freq
-          gain.gain.value = 0.5
+          gain.gain.value = 0.7
           osc.connect(gain)
           gain.connect(ctx.destination)
           osc.start()
