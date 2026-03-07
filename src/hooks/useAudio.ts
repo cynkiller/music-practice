@@ -47,14 +47,32 @@ export function useAudio() {
   const getCtx = useCallback((): any => {
     if (!audioCtxRef.current) {
       try {
+        // Route audio through speaker (not earpiece), ignore mute switch on iOS
+        try {
+          Taro.setInnerAudioOption({ mixWithOther: false, obeyMuteSwitch: false, speakerOn: true })
+          console.log('Audio routed to speaker')
+        } catch (e) {
+          console.warn('setInnerAudioOption failed:', e)
+        }
+
         audioCtxRef.current = (Taro as any).createWebAudioContext()
         console.log('Audio context created successfully')
-        
-        // Create master gain node for volume boost
-        masterGainRef.current = audioCtxRef.current.createGain()
-        masterGainRef.current.gain.value = 5.0 // 5x amplification
-        masterGainRef.current.connect(audioCtxRef.current.destination)
-        console.log('Master gain node created with 5x amplification')
+
+        // Loudness maximizer chain: gain → compressor → destination
+        const ctx = audioCtxRef.current
+        const compressor = ctx.createDynamicsCompressor()
+        compressor.threshold.value = -50  // activate at very low levels
+        compressor.knee.value = 40
+        compressor.ratio.value = 20       // heavy compression = louder perceived volume
+        compressor.attack.value = 0
+        compressor.release.value = 0.15
+
+        masterGainRef.current = ctx.createGain()
+        masterGainRef.current.gain.value = 10.0  // 10x pre-gain before compressor
+
+        masterGainRef.current.connect(compressor)
+        compressor.connect(ctx.destination)
+        console.log('Loudness maximizer chain created (gain 10x → compressor → output)')
         
         // Initialize cache instance (not hook) here
         if (!cacheRef.current) {
