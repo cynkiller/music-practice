@@ -144,7 +144,7 @@ function AnswerGrid({ options, onSelect, disabled, correctAnswer, userAnswer, sh
 // ─── Main Page ────────────────────────────────────────────────────────────────
 
 export default function Index() {
-  const { playInterval, playChord, playArpeggio, stopAll, isLoading: audioLoading } = useAudio()
+  const { playInterval, playChord, playArpeggio, stopAll, playNote, isLoading: audioLoading } = useAudio()
   const { progress, recordAnswer, addScore, updateHighestLevel, getMistakes, getWeaknesses, getAccuracyOverTime } = useProgress()
   const { t, language, toggleLanguage } = useI18n()
   const { isPreloading, preloadProgress, loadedCount, totalCount, isPreloaded, error, preloadAudio } = useAudioPreloader()
@@ -360,12 +360,19 @@ export default function Index() {
             {/* Controls */}
             <View style={{ display: 'flex' as const, alignItems: 'center' as const, justifyContent: 'center' as const, gap: '16rpx' }}>
               {status === 'playing' && (
-                <Button
-                  style={{ paddingLeft: '60rpx', paddingRight: '60rpx', paddingTop: '28rpx', paddingBottom: '28rpx', backgroundColor: audioLoading ? '#6366f1' : '#7c3aed', color: '#fff', fontWeight: '700' as const, borderRadius: '24rpx', fontSize: '30rpx' }}
-                  disabled={audioLoading}
-                  onClick={() => { stopAll(); handlePlaySound(); startAnswering() }}>
-                  {audioLoading ? '⏳ Loading...' : t.game.playSound}
-                </Button>
+                <>
+                  <Button
+                    style={{ paddingLeft: '16rpx', paddingRight: '16rpx', paddingTop: '8rpx', paddingBottom: '8rpx', backgroundColor: '#334155', color: '#f8fafc', borderRadius: '12rpx', fontSize: '22rpx' }}
+                    onClick={() => playNote('A4', 1000)}>
+                    🎵 A4
+                  </Button>
+                  <Button
+                    style={{ paddingLeft: '60rpx', paddingRight: '60rpx', paddingTop: '28rpx', paddingBottom: '28rpx', backgroundColor: audioLoading ? '#6366f1' : '#7c3aed', color: '#fff', fontWeight: '700' as const, borderRadius: '24rpx', fontSize: '30rpx' }}
+                    disabled={audioLoading}
+                    onClick={() => { stopAll(); handlePlaySound(); startAnswering() }}>
+                    {audioLoading ? '⏳ Loading...' : t.game.playSound}
+                  </Button>
+                </>
               )}
               {isAnswering && (
                 <>
