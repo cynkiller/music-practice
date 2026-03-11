@@ -377,6 +377,11 @@ export default function Index() {
               {isAnswering && (
                 <>
                   <Button
+                    style={{ paddingLeft: '16rpx', paddingRight: '16rpx', paddingTop: '8rpx', paddingBottom: '8rpx', backgroundColor: '#334155', color: '#f8fafc', borderRadius: '12rpx', fontSize: '22rpx' }}
+                    onClick={() => playNote('A4', 1000)}>
+                    🎵 A4
+                  </Button>
+                  <Button
                     style={{ paddingLeft: '28rpx', paddingRight: '28rpx', paddingTop: '18rpx', paddingBottom: '18rpx', backgroundColor: audioLoading ? '#475569' : '#334155', color: '#f8fafc', borderRadius: '16rpx', fontSize: '26rpx' }}
                     disabled={audioLoading}
                     onClick={() => { stopAll(); handlePlaySound() }}>

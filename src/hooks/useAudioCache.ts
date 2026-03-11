@@ -1,29 +1,43 @@
 import { useCallback } from 'react'
 import Taro from '@tarojs/taro'
 
-// Use our own GitHub-hosted files - 30 known-good files
-const AUDIO_BASE_URL = 'https://raw.githubusercontent.com/cynkiller/music-practice/mini-program/public/audio'
+// Use jsDelivr CDN for faster China Mainland access - High quality tonejs piano samples
+const AUDIO_BASE_URL = 'https://cdn.jsdelivr.net/npm/tonejs-instrument-piano-mp3@1.1.2'
 
 // Available sample files with their MIDI numbers
-// A(9), C(0), D#(3), F#(6) per octave = evenly spaced ~3 semitones, max pitch shift ~1.5 semitones
+// tonejs-instrument-piano-mp3 provides proper note names (A4.mp3, C4.mp3, etc.)
+// High quality Salamander Grand Piano samples via jsDelivr CDN
+// Note: CDN starts from A1, not A0. Use closest available samples.
 const SAMPLE_FILES: Array<{ file: string; midi: number }> = [
-  // A notes (pitch class 9)
-  { file: 'A0.mp3', midi: 21 },
+  // A notes (pitch class 9) - A1-A7 available, no A0
   { file: 'A1.mp3', midi: 33 }, { file: 'A2.mp3', midi: 45 }, { file: 'A3.mp3', midi: 57 },
   { file: 'A4.mp3', midi: 69 }, { file: 'A5.mp3', midi: 81 }, { file: 'A6.mp3', midi: 93 },
   { file: 'A7.mp3', midi: 105 },
-  // C notes (pitch class 0)
+  // C notes (pitch class 0) - C1-C8 available
   { file: 'C1.mp3', midi: 24 }, { file: 'C2.mp3', midi: 36 }, { file: 'C3.mp3', midi: 48 },
   { file: 'C4.mp3', midi: 60 }, { file: 'C5.mp3', midi: 72 }, { file: 'C6.mp3', midi: 84 },
   { file: 'C7.mp3', midi: 96 }, { file: 'C8.mp3', midi: 108 },
-  // D# (Ds) notes (pitch class 3)
+  // D# notes (pitch class 3) - Ds1-Ds7 available
   { file: 'Ds1.mp3', midi: 27 }, { file: 'Ds2.mp3', midi: 39 }, { file: 'Ds3.mp3', midi: 51 },
   { file: 'Ds4.mp3', midi: 63 }, { file: 'Ds5.mp3', midi: 75 }, { file: 'Ds6.mp3', midi: 87 },
   { file: 'Ds7.mp3', midi: 99 },
-  // F# (Fs) notes (pitch class 6)
+  // F# notes (pitch class 6) - Fs1-Fs7 available
   { file: 'Fs1.mp3', midi: 30 }, { file: 'Fs2.mp3', midi: 42 }, { file: 'Fs3.mp3', midi: 54 },
   { file: 'Fs4.mp3', midi: 66 }, { file: 'Fs5.mp3', midi: 78 }, { file: 'Fs6.mp3', midi: 90 },
   { file: 'Fs7.mp3', midi: 102 },
+  // Additional notes for better coverage - B, E, F, G
+  { file: 'B1.mp3', midi: 23 }, { file: 'B2.mp3', midi: 35 }, { file: 'B3.mp3', midi: 47 },
+  { file: 'B4.mp3', midi: 59 }, { file: 'B5.mp3', midi: 71 }, { file: 'B6.mp3', midi: 83 },
+  { file: 'B7.mp3', midi: 95 },
+  { file: 'E1.mp3', midi: 28 }, { file: 'E2.mp3', midi: 40 }, { file: 'E3.mp3', midi: 52 },
+  { file: 'E4.mp3', midi: 64 }, { file: 'E5.mp3', midi: 76 }, { file: 'E6.mp3', midi: 88 },
+  { file: 'E7.mp3', midi: 100 },
+  { file: 'F1.mp3', midi: 29 }, { file: 'F2.mp3', midi: 41 }, { file: 'F3.mp3', midi: 53 },
+  { file: 'F4.mp3', midi: 65 }, { file: 'F5.mp3', midi: 77 }, { file: 'F6.mp3', midi: 89 },
+  { file: 'F7.mp3', midi: 101 },
+  { file: 'G1.mp3', midi: 31 }, { file: 'G2.mp3', midi: 43 }, { file: 'G3.mp3', midi: 55 },
+  { file: 'G4.mp3', midi: 67 }, { file: 'G5.mp3', midi: 79 }, { file: 'G6.mp3', midi: 91 },
+  { file: 'G7.mp3', midi: 103 },
 ]
 
 const PITCH_CLASS: Record<string, number> = {
@@ -152,6 +166,33 @@ export class AudioCache {
 
   getStats() {
     return { cached: this.cache.size, loading: this.loadingPromises.size, total: SAMPLE_FILES.length }
+  }
+
+  async quickStart(onProgress: (loaded: number, total: number) => void): Promise<void> {
+    // Load only the most common notes for immediate usability
+    const essentialFiles = ['A4.mp3', 'C4.mp3', 'F4.mp3', 'G4.mp3', 'D4.mp3', 'E4.mp3', 'B4.mp3']
+    const total = essentialFiles.length
+    let loaded = 0
+    onProgress(loaded, total)
+
+    // Check what's already cached
+    const uncached = essentialFiles.filter(file => !this.cache.has(file))
+    
+    if (uncached.length === 0) return
+
+    // Load essential files in parallel for fastest startup
+    await Promise.allSettled(
+      uncached.map(async file => {
+        try {
+          await this.loadSample(file)
+        } catch (e) {
+          console.warn(`Quick start failed for ${file}:`, e)
+        } finally {
+          loaded++
+          onProgress(loaded, total)
+        }
+      })
+    )
   }
 
   async preloadAll(onProgress: (loaded: number, total: number) => void): Promise<void> {
