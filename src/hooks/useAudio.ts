@@ -131,6 +131,7 @@ export function useAudio() {
     (note: string, durationSec: number, startTime: number,
      sample: { buffer: AudioBuffer; playbackRate: number } | null) => {
       const ctx = getCtx()
+      const master = masterGainRef.current
       const now = ctx.currentTime
 
       // Validate startTime is in the future
@@ -139,50 +140,47 @@ export function useAudio() {
         startTime = now + 0.05
       }
 
+      // Determine output node: prefer loudness chain, fall back to destination
+      const output = master || ctx.destination
+
       try {
         if (sample) {
-          // Try sample playback
-          // Play 3 copies simultaneously — amplitudes sum at destination (3x volume)
-          // This bypasses WeChat's GainNode cap of 1.0
+          // Sample playback through the loudness maximizer chain
           try {
             const { buffer, playbackRate } = sample
-            const COPIES = 3
-            for (let i = 0; i < COPIES; i++) {
-              const source = ctx.createBufferSource()
-              source.buffer = buffer
-              source.playbackRate.value = playbackRate
-              source.connect(ctx.destination)
-              source.start(startTime)
-              source.stop(startTime + durationSec + 0.1)
-              const fakeGain = ctx.createGain()
-              activeNodesRef.current.push({ source, gain: fakeGain, stopTime: startTime + durationSec })
-            }
-            console.log(`✓ ${note} scheduled via sample x${COPIES} at t=${startTime.toFixed(3)}`)
+            const source = ctx.createBufferSource()
+            source.buffer = buffer
+            source.playbackRate.value = playbackRate
+            const gain = ctx.createGain()
+            gain.gain.value = 1.0
+            source.connect(gain)
+            gain.connect(output)
+            source.start(startTime)
+            source.stop(startTime + durationSec + 0.1)
+            activeNodesRef.current.push({ source, gain, stopTime: startTime + durationSec })
+            console.log(`✓ ${note} scheduled via sample at t=${startTime.toFixed(3)}`)
             return
           } catch (sampleError) {
             console.warn(`Sample playback failed for ${note}, falling back to oscillator:`, sampleError)
           }
         }
 
-        // Oscillator fallback — play 3 oscillators in parallel
+        // Oscillator fallback with ADSR envelope
         const freq = noteToFrequency(note)
-        const COPIES = 3
-        for (let i = 0; i < COPIES; i++) {
-          const osc = ctx.createOscillator()
-          const gain = ctx.createGain()
-          osc.type = 'triangle'
-          osc.frequency.setValueAtTime(freq, startTime)
-          gain.gain.setValueAtTime(0, startTime)
-          gain.gain.linearRampToValueAtTime(1.0, startTime + 0.01)
-          gain.gain.exponentialRampToValueAtTime(0.3, startTime + durationSec * 0.35)
-          gain.gain.exponentialRampToValueAtTime(0.001, startTime + durationSec)
-          osc.connect(gain)
-          gain.connect(ctx.destination)
-          osc.start(startTime)
-          osc.stop(startTime + durationSec)
-          activeNodesRef.current.push({ oscillator: osc, gain, stopTime: startTime + durationSec })
-        }
-        console.log(`✓ ${note} scheduled via oscillator x${COPIES} at t=${startTime.toFixed(3)}`)
+        const osc = ctx.createOscillator()
+        const gain = ctx.createGain()
+        osc.type = 'triangle'
+        osc.frequency.setValueAtTime(freq, startTime)
+        gain.gain.setValueAtTime(0, startTime)
+        gain.gain.linearRampToValueAtTime(1.0, startTime + 0.01)
+        gain.gain.exponentialRampToValueAtTime(0.3, startTime + durationSec * 0.35)
+        gain.gain.exponentialRampToValueAtTime(0.001, startTime + durationSec)
+        osc.connect(gain)
+        gain.connect(output)
+        osc.start(startTime)
+        osc.stop(startTime + durationSec)
+        activeNodesRef.current.push({ oscillator: osc, gain, stopTime: startTime + durationSec })
+        console.log(`✓ ${note} scheduled via oscillator at t=${startTime.toFixed(3)}`)
       } catch (error) {
         console.error(`CRITICAL: Failed to schedule ${note}:`, error)
         // Last-ditch effort: try immediate oscillator
@@ -192,9 +190,9 @@ export function useAudio() {
           const gain = ctx.createGain()
           osc.type = 'sine'
           osc.frequency.value = freq
-          gain.gain.value = 1.5
+          gain.gain.value = 1.0
           osc.connect(gain)
-          gain.connect(masterGainRef.current)
+          gain.connect(output)
           osc.start()
           osc.stop(ctx.currentTime + durationSec)
           console.log(`✓ ${note} emergency fallback triggered`)

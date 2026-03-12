@@ -25,19 +25,38 @@ const SAMPLE_FILES: Array<{ file: string; midi: number }> = [
   { file: 'Fs1.mp3', midi: 30 }, { file: 'Fs2.mp3', midi: 42 }, { file: 'Fs3.mp3', midi: 54 },
   { file: 'Fs4.mp3', midi: 66 }, { file: 'Fs5.mp3', midi: 78 }, { file: 'Fs6.mp3', midi: 90 },
   { file: 'Fs7.mp3', midi: 102 },
-  // Additional notes for better coverage - B, E, F, G
-  { file: 'B1.mp3', midi: 23 }, { file: 'B2.mp3', midi: 35 }, { file: 'B3.mp3', midi: 47 },
-  { file: 'B4.mp3', midi: 59 }, { file: 'B5.mp3', midi: 71 }, { file: 'B6.mp3', midi: 83 },
-  { file: 'B7.mp3', midi: 95 },
+  // A# notes (pitch class 10) - As1-As7 available
+  { file: 'As1.mp3', midi: 34 }, { file: 'As2.mp3', midi: 46 }, { file: 'As3.mp3', midi: 58 },
+  { file: 'As4.mp3', midi: 70 }, { file: 'As5.mp3', midi: 82 }, { file: 'As6.mp3', midi: 94 },
+  { file: 'As7.mp3', midi: 106 },
+  // B notes (pitch class 11) - B1-B7 available
+  { file: 'B1.mp3', midi: 35 }, { file: 'B2.mp3', midi: 47 }, { file: 'B3.mp3', midi: 59 },
+  { file: 'B4.mp3', midi: 71 }, { file: 'B5.mp3', midi: 83 }, { file: 'B6.mp3', midi: 95 },
+  { file: 'B7.mp3', midi: 107 },
+  // C# notes (pitch class 1) - Cs1-Cs7 available
+  { file: 'Cs1.mp3', midi: 25 }, { file: 'Cs2.mp3', midi: 37 }, { file: 'Cs3.mp3', midi: 49 },
+  { file: 'Cs4.mp3', midi: 61 }, { file: 'Cs5.mp3', midi: 73 }, { file: 'Cs6.mp3', midi: 85 },
+  { file: 'Cs7.mp3', midi: 97 },
+  // D notes (pitch class 2) - D1-D7 available
+  { file: 'D1.mp3', midi: 26 }, { file: 'D2.mp3', midi: 38 }, { file: 'D3.mp3', midi: 50 },
+  { file: 'D4.mp3', midi: 62 }, { file: 'D5.mp3', midi: 74 }, { file: 'D6.mp3', midi: 86 },
+  { file: 'D7.mp3', midi: 98 },
+  // E notes (pitch class 4) - E1-E7 available
   { file: 'E1.mp3', midi: 28 }, { file: 'E2.mp3', midi: 40 }, { file: 'E3.mp3', midi: 52 },
   { file: 'E4.mp3', midi: 64 }, { file: 'E5.mp3', midi: 76 }, { file: 'E6.mp3', midi: 88 },
   { file: 'E7.mp3', midi: 100 },
+  // F notes (pitch class 5) - F1-F7 available
   { file: 'F1.mp3', midi: 29 }, { file: 'F2.mp3', midi: 41 }, { file: 'F3.mp3', midi: 53 },
   { file: 'F4.mp3', midi: 65 }, { file: 'F5.mp3', midi: 77 }, { file: 'F6.mp3', midi: 89 },
   { file: 'F7.mp3', midi: 101 },
+  // G notes (pitch class 7) - G1-G7 available
   { file: 'G1.mp3', midi: 31 }, { file: 'G2.mp3', midi: 43 }, { file: 'G3.mp3', midi: 55 },
   { file: 'G4.mp3', midi: 67 }, { file: 'G5.mp3', midi: 79 }, { file: 'G6.mp3', midi: 91 },
   { file: 'G7.mp3', midi: 103 },
+  // G# notes (pitch class 8) - Gs1-Gs7 available
+  { file: 'Gs1.mp3', midi: 32 }, { file: 'Gs2.mp3', midi: 44 }, { file: 'Gs3.mp3', midi: 56 },
+  { file: 'Gs4.mp3', midi: 68 }, { file: 'Gs5.mp3', midi: 80 }, { file: 'Gs6.mp3', midi: 92 },
+  { file: 'Gs7.mp3', midi: 104 },
 ]
 
 const PITCH_CLASS: Record<string, number> = {
@@ -169,8 +188,11 @@ export class AudioCache {
   }
 
   async quickStart(onProgress: (loaded: number, total: number) => void): Promise<void> {
-    // Load only the most common notes for immediate usability
-    const essentialFiles = ['A4.mp3', 'C4.mp3', 'F4.mp3', 'G4.mp3', 'D4.mp3', 'E4.mp3', 'B4.mp3']
+    // Load all 12 chromatic notes at octave 4 for immediate usability
+    const essentialFiles = [
+      'A4.mp3', 'As4.mp3', 'B4.mp3', 'C4.mp3', 'Cs4.mp3', 'D4.mp3',
+      'Ds4.mp3', 'E4.mp3', 'F4.mp3', 'Fs4.mp3', 'G4.mp3', 'Gs4.mp3',
+    ]
     const total = essentialFiles.length
     let loaded = 0
     onProgress(loaded, total)
