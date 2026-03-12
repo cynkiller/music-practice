@@ -1,11 +1,11 @@
-import { useCallback, useEffect, useRef } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import { View, Text, Button, ScrollView } from '@tarojs/components'
 import { useAudio } from '../../hooks/useAudio'
 import { useProgress } from '../../hooks/useProgress'
 import { useGameState } from '../../hooks/useGameState'
 import { useI18n } from '../../hooks/useI18n'
 import { useAudioPreloader } from '../../hooks/useAudioPreloader'
-import type { Answer, Difficulty, GameState } from '../../types/index'
+import type { Answer, Difficulty, GameState, QuestionType } from '../../types/index'
 import type { Translations } from '../../lib/i18n'
 import { translateMusicName } from '../../lib/i18n'
 import { DIFFICULTY_CONFIGS, NOTES, noteFromSemitone } from '../../lib/musicTheory'
@@ -145,7 +145,7 @@ function AnswerGrid({ options, onSelect, disabled, correctAnswer, userAnswer, sh
 
 export default function Index() {
   const { playInterval, playChord, playArpeggio, stopAll, playNote, isLoading: audioLoading } = useAudio()
-  const { progress, recordAnswer, addScore, updateHighestLevel, getMistakes, getWeaknesses, getAccuracyOverTime } = useProgress()
+  const { progress, recordAnswer, addScore, updateHighestLevel, getMistakes, getWeaknesses, getConfusionPairs, getPerItemAccuracy, getAccuracyOverTime } = useProgress()
   const { t, language, toggleLanguage } = useI18n()
   const { isPreloading, preloadProgress, loadedCount, totalCount, isPreloaded, error, preloadAudio } = useAudioPreloader()
 
@@ -156,8 +156,10 @@ export default function Index() {
   const prevScoreRef  = useRef(0)
   const autoPlayedRef = useRef<string | null>(null)
 
-  const { state, startGame, startAnswering, submitAnswer, nextQuestion, goToMenu, goToReview, goToProgress } =
+  const { state, isPracticeMode, startGame, startPractice, startAnswering, submitAnswer, nextQuestion, goToMenu, goToReview, goToProgress } =
     useGameState(handleAnswer, handleScoreAdd, handleLevelUp)
+
+  const [reviewFilter, setReviewFilter] = useState<'all' | 'interval' | 'chord'>('all')
 
   // Preload audio samples on mount
   useEffect(() => {
@@ -347,7 +349,7 @@ export default function Index() {
         <ScrollView scrollY style={{ flex: 1 }}>
           <View style={{ padding: '24rpx', display: 'flex' as const, flexDirection: 'column' as const, gap: '24rpx' }}>
 
-            <ScoreBar state={state} onQuit={() => { stopAll(); goToMenu() }} t={t} />
+            <ScoreBar state={state} onQuit={() => { stopAll(); isPracticeMode ? goToReview() : goToMenu() }} t={t} />
 
             <View style={{ textAlign: 'center' as const }}>
               <Text style={{ color: '#64748b', fontSize: '22rpx', textTransform: 'uppercase' as const, letterSpacing: '2rpx' }}>
@@ -439,22 +441,127 @@ export default function Index() {
 
       {/* ── REVIEW ── */}
       {status === 'review' && (() => {
-        const mistakes    = getMistakes()
-        const weaknesses  = getWeaknesses()
-        const recent      = [...mistakes].reverse().slice(0, 50)
+        const mistakes       = getMistakes()
+        const weaknesses     = getWeaknesses()
+        const confusionPairs = getConfusionPairs()
+        const perItemAccuracy = getPerItemAccuracy()
+
+        const filteredMistakes = [...mistakes].reverse().slice(0, 50)
+          .filter(m => reviewFilter === 'all' || m.question.type === reviewFilter)
+        const filteredWeaknesses = weaknesses
+          .filter(w => reviewFilter === 'all' || w.type === reviewFilter)
+        const filteredConfusions = confusionPairs
+          .filter(c => reviewFilter === 'all' || c.type === reviewFilter)
+        const filteredAccuracy = perItemAccuracy
+          .filter(a => reviewFilter === 'all' || a.type === reviewFilter)
+
+        const hasWeaknesses = weaknesses.length > 0
+
+        const handleStartPractice = () => {
+          if (!hasWeaknesses) return
+          const recentDiff = mistakes.length > 0 ? mistakes[mistakes.length - 1].question.difficulty : 'easy' as Difficulty
+          startPractice(recentDiff, weaknesses)
+        }
+
+        const filterTabs: { id: 'all' | 'interval' | 'chord'; label: string }[] = [
+          { id: 'all', label: t.review.all },
+          { id: 'interval', label: t.review.intervals },
+          { id: 'chord', label: t.review.chords },
+        ]
+
         return (
           <ScrollView scrollY style={{ flex: 1 }}>
-            <View style={{ padding: '32rpx 28rpx', display: 'flex' as const, flexDirection: 'column' as const, gap: '40rpx' }}>
+            <View style={{ padding: '32rpx 28rpx', display: 'flex' as const, flexDirection: 'column' as const, gap: '32rpx' }}>
 
+              {/* Practice Weaknesses CTA */}
+              {hasWeaknesses && (
+                <Button
+                  style={{ width: '100%', backgroundColor: '#7c3aed', color: '#fff', fontWeight: '700' as const, borderRadius: '24rpx', paddingTop: '28rpx', paddingBottom: '28rpx', fontSize: '32rpx' }}
+                  onClick={handleStartPractice}>
+                  🎯 {t.review.practiceWeaknesses}
+                </Button>
+              )}
+
+              {/* Filter tabs */}
+              <View style={{ display: 'flex' as const, gap: '12rpx' }}>
+                {filterTabs.map(tab => (
+                  <Text
+                    key={tab.id}
+                    style={{
+                      paddingLeft: '20rpx', paddingRight: '20rpx', paddingTop: '12rpx', paddingBottom: '12rpx',
+                      borderRadius: '12rpx', fontSize: '24rpx', fontWeight: '500' as const,
+                      backgroundColor: reviewFilter === tab.id ? '#7c3aed' : '#1e293b',
+                      color: reviewFilter === tab.id ? '#f8fafc' : '#94a3b8',
+                    }}
+                    onClick={() => setReviewFilter(tab.id)}>
+                    {tab.label}
+                  </Text>
+                ))}
+              </View>
+
+              {/* Accuracy by Item */}
               <View>
-                <Text style={{ color: '#f8fafc', fontSize: '34rpx', fontWeight: '700' as const, marginBottom: '20rpx', display: 'block' as const }}>
+                <Text style={{ color: '#f8fafc', fontSize: '30rpx', fontWeight: '700' as const, marginBottom: '16rpx', display: 'block' as const }}>
+                  🎯 {t.review.accuracyByItem}
+                </Text>
+                {filteredAccuracy.length === 0 ? (
+                  <Text style={{ color: '#64748b', fontSize: '26rpx' }}>{t.review.noDataYet}</Text>
+                ) : (
+                  filteredAccuracy.map(item => (
+                    <View key={item.name} style={{ backgroundColor: '#1e293b', borderWidth: 1, borderStyle: 'solid' as const, borderColor: '#334155', borderRadius: '16rpx', paddingLeft: '24rpx', paddingRight: '24rpx', paddingTop: '16rpx', paddingBottom: '16rpx', marginBottom: '12rpx' }}>
+                      <View style={{ display: 'flex' as const, justifyContent: 'space-between' as const, alignItems: 'center' as const, marginBottom: '10rpx' }}>
+                        <View style={{ display: 'flex' as const, alignItems: 'center' as const, gap: '12rpx' }}>
+                          <Text style={{ color: '#f8fafc', fontSize: '24rpx', fontWeight: '500' as const }}>{translateMusicName(item.name, t, item.type)}</Text>
+                          <Text style={{ color: '#64748b', fontSize: '20rpx', textTransform: 'uppercase' as const }}>{item.type === 'interval' ? t.review.intervals : t.review.chords}</Text>
+                        </View>
+                        <Text style={{ fontSize: '24rpx', fontWeight: '700' as const, color: item.accuracy >= 80 ? '#4ade80' : item.accuracy >= 50 ? '#fbbf24' : '#f87171' }}>
+                          {item.accuracy}%
+                        </Text>
+                      </View>
+                      <View style={{ backgroundColor: '#334155', borderRadius: '6rpx', height: '10rpx', overflow: 'hidden' as const }}>
+                        <View style={{
+                          height: '100%', borderRadius: '6rpx',
+                          width: `${item.accuracy}%`,
+                          backgroundColor: item.accuracy >= 80 ? '#059669' : item.accuracy >= 50 ? '#d97706' : '#dc2626',
+                        }} />
+                      </View>
+                      <Text style={{ color: '#64748b', fontSize: '20rpx', marginTop: '6rpx' }}>
+                        {item.correct}/{item.total} {t.review.correct}
+                      </Text>
+                    </View>
+                  ))
+                )}
+              </View>
+
+              {/* Confusion Pairs */}
+              {filteredConfusions.length > 0 && (
+                <View>
+                  <Text style={{ color: '#f8fafc', fontSize: '30rpx', fontWeight: '700' as const, marginBottom: '16rpx', display: 'block' as const }}>
+                    🔀 {t.review.commonConfusions}
+                  </Text>
+                  {filteredConfusions.map((pair, i) => (
+                    <View key={`${pair.correct}-${pair.confused}-${i}`} style={{ backgroundColor: '#1e293b', borderWidth: 1, borderStyle: 'solid' as const, borderColor: '#334155', borderRadius: '16rpx', paddingLeft: '24rpx', paddingRight: '24rpx', paddingTop: '16rpx', paddingBottom: '16rpx', marginBottom: '12rpx', display: 'flex' as const, justifyContent: 'space-between' as const, alignItems: 'center' as const }}>
+                      <View style={{ display: 'flex' as const, alignItems: 'center' as const, gap: '10rpx' }}>
+                        <Text style={{ color: '#4ade80', fontSize: '24rpx', fontWeight: '500' as const }}>{translateMusicName(pair.correct, t, pair.type)}</Text>
+                        <Text style={{ color: '#64748b', fontSize: '22rpx' }}>{t.review.mistakenFor}</Text>
+                        <Text style={{ color: '#f87171', fontSize: '24rpx', fontWeight: '500' as const }}>{translateMusicName(pair.confused, t, pair.type)}</Text>
+                      </View>
+                      <Text style={{ color: '#94a3b8', fontSize: '22rpx', fontWeight: '700' as const }}>{pair.count}x</Text>
+                    </View>
+                  ))}
+                </View>
+              )}
+
+              {/* Areas to Improve */}
+              <View>
+                <Text style={{ color: '#f8fafc', fontSize: '30rpx', fontWeight: '700' as const, marginBottom: '16rpx', display: 'block' as const }}>
                   {t.review.areasToImprove}
                 </Text>
-                {weaknesses.length === 0 ? (
+                {filteredWeaknesses.length === 0 ? (
                   <Text style={{ color: '#64748b', fontSize: '26rpx' }}>{t.review.noMistakesRecorded}</Text>
                 ) : (
                   <View style={{ display: 'flex' as const, flexWrap: 'wrap' as const, gap: '14rpx' }}>
-                    {weaknesses.map(w => (
+                    {filteredWeaknesses.map(w => (
                       <View key={w.name} style={{ width: 'calc(50% - 7rpx)', backgroundColor: '#1e293b', borderWidth: 1, borderStyle: 'solid' as const, borderColor: '#334155', borderRadius: '16rpx', paddingLeft: '20rpx', paddingRight: '20rpx', paddingTop: '16rpx', paddingBottom: '16rpx', display: 'flex' as const, justifyContent: 'space-between' as const, alignItems: 'center' as const }}>
                         <Text style={{ color: '#f8fafc', fontSize: '24rpx', fontWeight: '500' as const }}>{translateMusicName(w.name, t, w.type)}</Text>
                         <Text style={{ color: '#f87171', fontSize: '22rpx', fontWeight: '700' as const }}>{w.count}x</Text>
@@ -464,14 +571,15 @@ export default function Index() {
                 )}
               </View>
 
+              {/* Recent Mistakes */}
               <View>
-                <Text style={{ color: '#f8fafc', fontSize: '34rpx', fontWeight: '700' as const, marginBottom: '20rpx', display: 'block' as const }}>
+                <Text style={{ color: '#f8fafc', fontSize: '30rpx', fontWeight: '700' as const, marginBottom: '16rpx', display: 'block' as const }}>
                   {t.review.recentMistakes}
                 </Text>
-                {recent.length === 0 ? (
+                {filteredMistakes.length === 0 ? (
                   <Text style={{ color: '#64748b', fontSize: '26rpx' }}>{t.review.noMistakesYet}</Text>
                 ) : (
-                  recent.map((m, i) => (
+                  filteredMistakes.map((m, i) => (
                     <View key={`${m.questionId}-${i}`} style={{ backgroundColor: '#1e293b', borderWidth: 1, borderStyle: 'solid' as const, borderColor: '#334155', borderRadius: '16rpx', paddingLeft: '24rpx', paddingRight: '24rpx', paddingTop: '18rpx', paddingBottom: '18rpx', marginBottom: '12rpx', display: 'flex' as const, justifyContent: 'space-between' as const, alignItems: 'center' as const, gap: '16rpx' }}>
                       <View style={{ flex: 1 }}>
                         <View style={{ display: 'flex' as const, gap: '12rpx', marginBottom: '8rpx' }}>

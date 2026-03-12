@@ -45,6 +45,15 @@ export interface Translations {
     noMistakesYet: string
     youAnswered: string
     replay: string
+    practiceWeaknesses: string
+    accuracyByItem: string
+    commonConfusions: string
+    mistakenFor: string
+    noDataYet: string
+    all: string
+    intervals: string
+    chords: string
+    correct: string
   }
   progress: {
     yourProgress: string
@@ -116,7 +125,16 @@ export const translations: Record<Language, Translations> = {
       noMistakesRecorded: 'No mistakes recorded yet. Start playing!',
       noMistakesYet: 'No mistakes yet!',
       youAnswered: 'You answered',
-      replay: '🔊'
+      replay: '🔊',
+      practiceWeaknesses: 'Practice Weaknesses',
+      accuracyByItem: 'Accuracy by Item',
+      commonConfusions: 'Common Confusions',
+      mistakenFor: 'mistaken for',
+      noDataYet: 'No data yet. Start playing!',
+      all: 'All',
+      intervals: 'Intervals',
+      chords: 'Chords',
+      correct: 'correct',
     },
     progress: {
       yourProgress: '📊 Your Progress',
@@ -219,7 +237,16 @@ export const translations: Record<Language, Translations> = {
       noMistakesRecorded: '还没有错误记录。开始游戏！',
       noMistakesYet: '还没有错误！',
       youAnswered: '你回答了',
-      replay: '🔊'
+      replay: '🔊',
+      practiceWeaknesses: '针对练习',
+      accuracyByItem: '各项准确率',
+      commonConfusions: '常见混淆',
+      mistakenFor: '误选为',
+      noDataYet: '暂无数据。开始游戏！',
+      all: '全部',
+      intervals: '音程',
+      chords: '和弦',
+      correct: '正确',
     },
     progress: {
       yourProgress: '📊 你的进度',

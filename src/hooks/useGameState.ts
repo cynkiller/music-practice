@@ -1,6 +1,7 @@
 import { useState, useCallback, useRef } from 'react';
 import type { GameState, Difficulty, Answer } from '../types/index.ts';
-import { generateQuestion } from '../lib/questionGenerator.ts';
+import { generateQuestion, generatePracticeQuestion } from '../lib/questionGenerator.ts';
+import type { PracticeFocus } from '../lib/questionGenerator.ts';
 import { calculateScore, getLevelUpThreshold } from '../lib/scoring.ts';
 
 type GameStatus = GameState['status'];
@@ -26,12 +27,14 @@ export function useGameState(
   const [state, setState] = useState<GameState>(initialState);
   const answerStartRef = useRef<number>(0);
   const levelScoreRef = useRef<number>(0);
+  const practiceItemsRef = useRef<PracticeFocus[] | null>(null);
 
   const setStatus = useCallback((status: GameStatus) => {
     setState(prev => ({ ...prev, status }));
   }, []);
 
   const startGame = useCallback((difficulty: Difficulty, level: number) => {
+    practiceItemsRef.current = null;
     const question = generateQuestion(difficulty, level);
     levelScoreRef.current = 0;
     setState({
@@ -39,6 +42,19 @@ export function useGameState(
       status: 'playing',
       difficulty,
       level,
+      currentQuestion: question,
+    });
+  }, []);
+
+  const startPractice = useCallback((difficulty: Difficulty, focusItems: PracticeFocus[]) => {
+    practiceItemsRef.current = focusItems;
+    const question = generatePracticeQuestion(difficulty, focusItems);
+    levelScoreRef.current = 0;
+    setState({
+      ...initialState,
+      status: 'playing',
+      difficulty,
+      level: 0,
       currentQuestion: question,
     });
   }, []);
@@ -94,6 +110,15 @@ export function useGameState(
 
   const nextQuestion = useCallback(() => {
     setState(prev => {
+      // Practice mode: no level-ups, just generate next practice question
+      if (practiceItemsRef.current) {
+        const question = generatePracticeQuestion(
+          prev.difficulty,
+          practiceItemsRef.current
+        );
+        return { ...prev, status: 'playing', currentQuestion: question };
+      }
+
       const threshold = getLevelUpThreshold(prev.level);
       let newLevel = prev.level;
 
@@ -118,11 +143,15 @@ export function useGameState(
     });
   }, [onLevelUp]);
 
+  const isPracticeMode = practiceItemsRef.current !== null;
+
   const goToMenu = useCallback(() => {
+    practiceItemsRef.current = null;
     setState(prev => ({ ...prev, status: 'menu', currentQuestion: null }));
   }, []);
 
   const goToReview = useCallback(() => {
+    practiceItemsRef.current = null;
     setState(prev => ({ ...prev, status: 'review' }));
   }, []);
 
@@ -132,8 +161,10 @@ export function useGameState(
 
   return {
     state,
+    isPracticeMode,
     setStatus,
     startGame,
+    startPractice,
     startAnswering,
     submitAnswer,
     nextQuestion,

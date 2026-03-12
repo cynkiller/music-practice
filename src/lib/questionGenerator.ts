@@ -1,5 +1,5 @@
 import type { Question, QuestionType, Difficulty, Answer } from '../types/index.ts';
-import { NOTES, BASE_OCTAVE, DIFFICULTY_CONFIGS } from './musicTheory.ts';
+import { NOTES, BASE_OCTAVE, DIFFICULTY_CONFIGS, INTERVALS, CHORD_TYPES } from './musicTheory.ts';
 import { getLevelConfig } from './levelConfig.ts';
 
 let questionCounter = 0;
@@ -112,6 +112,78 @@ export function generateQuestion(
       options,
       difficulty,
       level,
+    };
+  }
+}
+
+export interface PracticeFocus {
+  name: string;
+  type: QuestionType;
+  count: number;
+}
+
+export function generatePracticeQuestion(
+  difficulty: Difficulty,
+  focusItems: PracticeFocus[],
+): Question {
+  const diffConfig = DIFFICULTY_CONFIGS[difficulty];
+  const root = getRandomRoot();
+
+  // Build weighted pool from focus items (more mistakes = higher weight)
+  const weightedItems: PracticeFocus[] = [];
+  for (const item of focusItems) {
+    const weight = Math.max(1, item.count);
+    for (let i = 0; i < weight; i++) weightedItems.push(item);
+  }
+
+  const chosen = pickRandom(weightedItems);
+
+  if (chosen.type === 'interval') {
+    const interval = INTERVALS.find(i => i.name === chosen.name);
+    if (!interval) return generateQuestion(difficulty, 1);
+
+    // Use all intervals at this difficulty as distractor pool
+    const allIntervalNames = diffConfig.intervals.map(i => i.name);
+    if (!allIntervalNames.includes(chosen.name)) allIntervalNames.push(chosen.name);
+    const options = generateDistractors(
+      chosen.name,
+      allIntervalNames,
+      diffConfig.answerOptionCount
+    );
+
+    questionCounter++;
+    return {
+      id: `p-${Date.now()}-${questionCounter}`,
+      type: 'interval',
+      rootNote: root,
+      targetName: chosen.name,
+      semitones: [0, interval.semitones],
+      options,
+      difficulty,
+      level: 0,
+    };
+  } else {
+    const chord = CHORD_TYPES.find(c => c.name === chosen.name);
+    if (!chord) return generateQuestion(difficulty, 1);
+
+    const allChordNames = diffConfig.chords.map(c => c.name);
+    if (!allChordNames.includes(chosen.name)) allChordNames.push(chosen.name);
+    const options = generateDistractors(
+      chosen.name,
+      allChordNames,
+      diffConfig.answerOptionCount
+    );
+
+    questionCounter++;
+    return {
+      id: `p-${Date.now()}-${questionCounter}`,
+      type: 'chord',
+      rootNote: root,
+      targetName: chosen.name,
+      semitones: chord.intervals,
+      options,
+      difficulty,
+      level: 0,
     };
   }
 }

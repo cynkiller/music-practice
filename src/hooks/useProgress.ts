@@ -1,6 +1,6 @@
 import { useState, useCallback, useEffect } from 'react';
 import Taro from '@tarojs/taro';
-import type { UserProgress, Answer, Difficulty } from '../types/index.ts';
+import type { UserProgress, Answer, Difficulty, QuestionType } from '../types/index.ts';
 
 const STORAGE_KEY = 'music-practice-progress';
 
@@ -114,6 +114,53 @@ export function useProgress() {
     return buckets;
   }, [progress.answers]);
 
+  const getConfusionPairs = useCallback(() => {
+    const mistakes = progress.answers.filter(a => !a.isCorrect);
+    const pairCounts = new Map<string, { correct: string; confused: string; count: number; type: QuestionType }>();
+    for (const m of mistakes) {
+      const key = `${m.correctAnswer}→${m.userAnswer}`;
+      const existing = pairCounts.get(key);
+      if (existing) {
+        existing.count++;
+      } else {
+        pairCounts.set(key, {
+          correct: m.correctAnswer,
+          confused: m.userAnswer,
+          count: 1,
+          type: m.question.type,
+        });
+      }
+    }
+    return Array.from(pairCounts.values())
+      .sort((a, b) => b.count - a.count)
+      .slice(0, 10);
+  }, [progress.answers]);
+
+  const getPerItemAccuracy = useCallback(() => {
+    const items = new Map<string, { name: string; type: QuestionType; total: number; correct: number }>();
+    for (const a of progress.answers) {
+      const key = a.question.targetName;
+      const existing = items.get(key);
+      if (existing) {
+        existing.total++;
+        if (a.isCorrect) existing.correct++;
+      } else {
+        items.set(key, {
+          name: key,
+          type: a.question.type,
+          total: 1,
+          correct: a.isCorrect ? 1 : 0,
+        });
+      }
+    }
+    return Array.from(items.values())
+      .map(item => ({
+        ...item,
+        accuracy: Math.round((item.correct / item.total) * 100),
+      }))
+      .sort((a, b) => a.accuracy - b.accuracy);
+  }, [progress.answers]);
+
   return {
     progress,
     recordAnswer,
@@ -122,6 +169,8 @@ export function useProgress() {
     resetProgress,
     getMistakes,
     getWeaknesses,
+    getConfusionPairs,
+    getPerItemAccuracy,
     getAccuracyOverTime,
   };
 }

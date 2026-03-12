@@ -7,7 +7,7 @@ import { DifficultySelector } from './components/DifficultySelector.tsx';
 import { GameBoard } from './components/GameBoard.tsx';
 import { ReviewPanel } from './components/ReviewPanel.tsx';
 import { ProgressCharts } from './components/ProgressCharts.tsx';
-import type { Answer, Difficulty } from './types/index.ts';
+import type { Answer, Difficulty, QuestionType } from './types/index.ts';
 
 function App() {
   const { playInterval, playChord, playArpeggio, stopAll, isLoading } = useAudio();
@@ -18,6 +18,8 @@ function App() {
     updateHighestLevel,
     getMistakes,
     getWeaknesses,
+    getConfusionPairs,
+    getPerItemAccuracy,
     getAccuracyOverTime,
   } = useProgress();
 
@@ -44,7 +46,9 @@ function App() {
 
   const {
     state,
+    isPracticeMode,
     startGame,
+    startPractice,
     startAnswering,
     submitAnswer,
     nextQuestion,
@@ -90,6 +94,13 @@ function App() {
     [playInterval, playChord]
   );
 
+  const handleStartPractice = useCallback(
+    (difficulty: Difficulty, items: { name: string; type: QuestionType; count: number }[]) => {
+      startPractice(difficulty, items);
+    },
+    [startPractice]
+  );
+
   return (
     <div className="min-h-screen bg-slate-950 text-white flex flex-col">
       <Header
@@ -125,7 +136,7 @@ function App() {
             onStartAnswering={startAnswering}
             onAnswer={submitAnswer}
             onNext={nextQuestion}
-            onQuit={goToMenu}
+            onQuit={isPracticeMode ? goToReview : goToMenu}
             stopAll={stopAll}
           />
         )}
@@ -134,7 +145,10 @@ function App() {
           <ReviewPanel
             mistakes={getMistakes()}
             weaknesses={getWeaknesses()}
+            confusionPairs={getConfusionPairs()}
+            perItemAccuracy={getPerItemAccuracy()}
             onReplay={handleReplay}
+            onStartPractice={handleStartPractice}
           />
         )}
 
