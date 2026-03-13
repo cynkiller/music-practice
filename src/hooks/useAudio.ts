@@ -156,8 +156,14 @@ export function useAudio() {
             source.connect(gain)
             gain.connect(output)
             source.start(startTime)
-            source.stop(startTime + durationSec + 0.1)
-            activeNodesRef.current.push({ source, gain, stopTime: startTime + durationSec })
+            // Smooth fade-out: let the sample's natural timbre ring,
+            // then exponentially decay over 0.3s so the cut-off is inaudible.
+            const fadeStart = startTime + durationSec
+            const fadeDur = 0.3
+            gain.gain.setValueAtTime(1.0, fadeStart)
+            gain.gain.exponentialRampToValueAtTime(0.001, fadeStart + fadeDur)
+            source.stop(fadeStart + fadeDur + 0.05)
+            activeNodesRef.current.push({ source, gain, stopTime: fadeStart + fadeDur })
             console.log(`✓ ${note} scheduled via sample at t=${startTime.toFixed(3)}`)
             return
           } catch (sampleError) {
